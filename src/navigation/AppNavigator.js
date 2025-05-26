@@ -6,7 +6,7 @@ import { ActivityIndicator, View } from 'react-native';
 import HomeScreen from '../screens/home/HomeScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
-import ContactsScreen from '../screens/modules/ContactsScreen';
+import ModuleScreen from '../screens/modules/ModuleScreen';
 import { useAuth } from '../context/AuthContext';
 
 const Stack = createStackNavigator();
@@ -44,8 +44,8 @@ const AppNavigator = () => {
               component={ProfileScreen}
             />
             <Stack.Screen 
-              name="Contacts" 
-              component={ContactsScreen}
+              name="ModuleScreen" 
+              component={ModuleScreen}
             />
           </>
         )}

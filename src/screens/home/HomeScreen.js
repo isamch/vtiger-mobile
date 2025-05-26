@@ -40,7 +40,7 @@ const HomeScreen = ({ navigation }) => {
                 icon={module.icon}
                 color={module.color}
                 // count={module.count}
-                onPress={() => navigation.navigate(module.name)}
+                onPress={() => navigation.navigate('ModuleScreen', { moduleName: module.name })}
               />
             ))}
           </View>

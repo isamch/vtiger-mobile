@@ -39,7 +39,18 @@ const LoginScreen = ({ navigation }) => {
         if (result.httpStatus === 401) {
           Alert.alert('Login Failed', 'Invalid credentials');
         } else {
-          Alert.alert('Login Failed', result.error || 'An unexpected error occurred');
+          let errorMessage = 'An unexpected error occurred';
+
+          try {
+            const parsedError = JSON.parse(result.error);
+            errorMessage = parsedError.error || errorMessage;
+          } catch (e) {
+            errorMessage = result.error || errorMessage;
+          }
+
+          Alert.alert('Login Failed', errorMessage);
+          console.log(errorMessage)
+          
         }
       }
     } catch (error) {

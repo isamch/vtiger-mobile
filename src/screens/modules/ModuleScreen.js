@@ -3,19 +3,21 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 
-const ContactsScreen = ({ navigation }) => {
+const ModuleScreen = ({ route, navigation }) => {
+  const { moduleName } = route.params;
+
   return (
     <View style={styles.container}>
       <Header />
       <ScrollView style={styles.content}>
         <View style={styles.headerContainer}>
-          <Text style={styles.title}>Contacts</Text>
-          <Text style={styles.subtitle}>Manage your contacts here</Text>
+          <Text style={styles.title}>{moduleName}</Text>
+          <Text style={styles.subtitle}>Manage your {moduleName.toLowerCase()} here</Text>
         </View>
-        
-        {/* Placeholder for contacts list - to be implemented */}
-        <View style={styles.contactsContainer}>
-          <Text style={styles.placeholder}>Contact list coming soon...</Text>
+
+        {/* Placeholder for module content - to be implemented */}
+        <View style={styles.moduleContentContainer}>
+          <Text style={styles.placeholder}>{moduleName} content coming soon...</Text>
         </View>
       </ScrollView>
       <Footer navigation={navigation} />
@@ -47,7 +49,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  contactsContainer: {
+  moduleContentContainer: {
     flex: 1,
     padding: 20,
     alignItems: 'center',
@@ -59,4 +61,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ContactsScreen; 
+export default ModuleScreen; 
