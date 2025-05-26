@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Footer from '../../components/Footer';
 import Header from '../../components/Header';
 import ModuleCard from '../../components/ModuleCard';
-import { Modules } from '../../services/api/modules';
+import { Modules } from '../../services/api/modules/modules';
 
 const HomeScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
