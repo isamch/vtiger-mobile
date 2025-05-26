@@ -9,7 +9,21 @@ const ModuleCard = ({ name, icon, color, count, onPress }) => {
         <Ionicons name={icon} size={24} color="white" />
       </View>
       <Text style={styles.moduleName}>{name}</Text>
-      <Text style={styles.moduleCount}>{count}</Text>
+      
+      {/* <Text style={styles.moduleCount}>{count}</Text> */}
+
+      <TouchableOpacity
+        style={styles.actionButton}
+        onPress={onPress}
+      >
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={[{ color: color }]}>View Details </Text>
+            <Ionicons name="chevron-forward" size={14} color={color} />
+          </View>
+
+      </TouchableOpacity>
+
+
     </TouchableOpacity>
   );
 };
