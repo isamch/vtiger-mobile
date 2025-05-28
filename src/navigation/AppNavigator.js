@@ -6,7 +6,7 @@ import { ActivityIndicator, View } from 'react-native';
 import HomeScreen from '../screens/home/HomeScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
-import ModuleScreen from '../screens/modules/ModuleScreen';
+import IndexScreen from '../screens/modules/indexScreen';
 import { useAuth } from '../context/AuthContext';
 
 const Stack = createStackNavigator();
@@ -45,7 +45,7 @@ const AppNavigator = () => {
             />
             <Stack.Screen 
               name="ModuleScreen" 
-              component={ModuleScreen}
+              component={IndexScreen}
             />
           </>
         )}
