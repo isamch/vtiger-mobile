@@ -74,32 +74,43 @@ const IndexScreen = ({ route, navigation }) => {
 
 		return (
 			<View style={styles.detailsContainer}>
-				{detailFields.map((field, idx) => {
-					let displayValue = field.value;
-
-					if (field.fieldname === 'assigned_user_id' && field.userMap) {
-						displayValue = field.userMap[field.value] || field.value;
-					}
-
-					displayValue = displayValue === null || displayValue === undefined || displayValue === '' ?
-						<Text style={styles.emptyValue}>Not set</Text> :
-						String(displayValue);
-
-					return (
-						<View key={idx} style={styles.detailRow}>
-							<Text style={styles.detailLabel}>{field.label}:</Text>
-							<Text style={styles.detailValue}>{displayValue}</Text>
-						</View>
-					);
-				})}
-
-				<TouchableOpacity
-					style={styles.viewDetailsButton}
-					onPress={() => navigation.navigate('UserDetails', { userId: item.id })}
+				{/* Scrollable content area */}
+				<ScrollView
+					style={styles.detailsScrollView}
+					contentContainerStyle={styles.detailsScrollContent}
+					showsVerticalScrollIndicator={true}
+					nestedScrollEnabled={true}
 				>
-					<Text style={styles.viewDetailsText}>View Details</Text>
-					<Icon name="arrow-forward" size={18} color="#4f46e5" />
-				</TouchableOpacity>
+					{detailFields.map((field, idx) => {
+						let displayValue = field.value;
+
+						if (field.fieldname === 'assigned_user_id' && field.userMap) {
+							displayValue = field.userMap[field.value] || field.value;
+						}
+
+						displayValue = displayValue === null || displayValue === undefined || displayValue === '' ?
+							<Text style={styles.emptyValue}>Not set</Text> :
+							String(displayValue);
+
+						return (
+							<View key={idx} style={styles.detailRow}>
+								<Text style={styles.detailLabel}>{field.label}:</Text>
+								<Text style={styles.detailValue}>{displayValue}</Text>
+							</View>
+						);
+					})}
+				</ScrollView>
+
+				{/* Fixed Update button at the bottom */}
+				<View style={styles.fixedButtonContainer}>
+					<TouchableOpacity
+						style={styles.updateButton}
+						onPress={() => navigation.navigate('UserDetails', { userId: item.id })}
+					>
+						<Icon name="edit" size={18} color="#ffffff" />
+						<Text style={styles.updateButtonText}>Edit</Text>
+					</TouchableOpacity>
+				</View>
 			</View>
 		);
 	};
@@ -126,7 +137,9 @@ const IndexScreen = ({ route, navigation }) => {
 							<View style={styles.avatarCircle}>
 								<Text style={styles.avatarText}>{initial}</Text>
 							</View>
-							<Text style={styles.recordLabel}>{mainLabel}</Text>
+							<Text style={styles.recordLabel}>
+								{mainLabel} {item.fields[1]?.value ? ` ${item.fields[1].value}` : ''}
+							</Text>
 						</View>
 						<View style={styles.assignedToContainer}>
 							<Text style={styles.assignedToLabel}>Assigned to:</Text>
@@ -302,10 +315,11 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		marginLeft: 8,
 	},
+
 	moduleContentContainer: {
 		flex: 1,
 		paddingHorizontal: 16,
-		paddingBottom: 16,
+		paddingBottom: 32,
 	},
 	searchContainer: {
 		flexDirection: 'row',
@@ -461,52 +475,95 @@ const styles = StyleSheet.create({
 		width: 24,
 		height: 24,
 	},
+
+
 	detailsContainer: {
 		backgroundColor: '#f3f4f6',
-		paddingHorizontal: 20,
-		paddingVertical: 16,
+		height: 600,
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
+		marginBottom: 8,
 	},
+
+	detailsScrollView: {
+		flex: 1,
+		paddingHorizontal: 20,
+		paddingTop: 16,
+	},
+
+	detailsScrollContent: {
+		paddingBottom: 16,
+	},
+
 	detailRow: {
 		flexDirection: 'row',
 		paddingVertical: 8,
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
 	},
+
 	detailLabel: {
 		flex: 1,
 		fontSize: 14,
 		color: '#4b5563',
 		fontWeight: '500',
 	},
+
 	detailValue: {
 		flex: 2,
 		fontSize: 14,
 		color: '#111827',
 	},
+
 	emptyValue: {
 		fontStyle: 'italic',
 		color: '#9ca3af',
 	},
-	viewDetailsButton: {
+
+	fixedButtonContainer: {
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#e5e7eb',
+		backgroundColor: '#ffffff',
+		shadowColor: '#000',
+		shadowOffset: {
+			width: 0,
+			height: -2,
+		},
+		shadowOpacity: 0.1,
+		shadowRadius: 3,
+		elevation: 3,
+	},
+
+	updateButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginTop: 16,
-		paddingVertical: 10,
-		paddingHorizontal: 16,
-		backgroundColor: '#eef2ff',
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: '#e0e7ff',
+		paddingVertical: 12,
+		paddingHorizontal: 24,
+		backgroundColor: '#2196F3',
+		borderRadius: 6,
+		shadowColor: '#000',
+		shadowOffset: {
+			width: 0,
+			height: 2,
+		},
+		shadowOpacity: 0.15,
+		shadowRadius: 3,
+		elevation: 2,
 	},
-	viewDetailsText: {
-		fontSize: 14,
+
+	updateButtonText: {
+		fontSize: 15,
 		fontWeight: '600',
-		color: '#4f46e5',
-		marginRight: 8,
+		color: '#ffffff',
+		marginLeft: 8,
+		letterSpacing: 0.3,
 	},
+
+
+
 	assignedToContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
