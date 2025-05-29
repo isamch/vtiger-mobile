@@ -7,6 +7,8 @@ import HomeScreen from '../screens/home/HomeScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import IndexScreen from '../screens/modules/indexScreen';
+import ViewScreen from '../screens/modules/ViewScreen';
+import EditScreen from '../screens/modules/EditScreen';
 import { useAuth } from '../context/AuthContext';
 
 const Stack = createStackNavigator();
@@ -46,6 +48,14 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="ModuleScreen" 
               component={IndexScreen}
+            />
+            <Stack.Screen 
+              name="ViewScreen" 
+              component={ViewScreen}
+            />
+            <Stack.Screen 
+              name="EditScreen" 
+              component={EditScreen}
             />
           </>
         )}

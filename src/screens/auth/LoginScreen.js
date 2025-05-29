@@ -34,7 +34,7 @@ const LoginScreen = ({ navigation }) => {
       const result = await authLogin(username, accessKey);
 
       if (isSuccessResponse(result)) {
-        await signIn(result.sessionName);
+        await signIn(result.data);
       } else {
         if (result.httpStatus === 401) {
           Alert.alert('Login Failed', 'Invalid credentials');

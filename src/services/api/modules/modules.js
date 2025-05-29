@@ -5,8 +5,6 @@ export const Modules = async ( ) => {
   try {
     const sessionName = await AsyncStorage.getItem('sessionName');
     
-
-
     const response = await fetch(`http://10.0.2.2:8080/vtigercrm/api/modules/get_modules.php?sessionName=${sessionName}`);
 
     

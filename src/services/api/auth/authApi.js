@@ -16,7 +16,7 @@ const ResponseStatus = {
  * Authenticate user and get session name
  * @param {string} username - User's username
  * @param {string} accessKey - User's access key
- * @returns {Promise<{status: string, sessionName?: string, error?: string}>}
+ * @returns {Promise<{status: string, data?: Object, error?: string}>}
  */
 export const login = async (username, accessKey) => {
   try {
@@ -71,10 +71,10 @@ export const login = async (username, accessKey) => {
       };
     }
 
-    if (data.sessionName) {
+    if (data['Auth User'] && data['Auth User'].sessionName) {
       return {
         status: ResponseStatus.SUCCESS,
-        sessionName: data.sessionName,
+        data: data,
       };
     } else {
       return {

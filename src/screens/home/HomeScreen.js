@@ -14,6 +14,7 @@ const HomeScreen = ({ navigation }) => {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
+
   const fetchModules = async (isRefresh = false) => {
     try {
       if (isRefresh) {

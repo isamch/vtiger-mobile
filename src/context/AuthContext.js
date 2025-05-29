@@ -6,6 +6,7 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [userSession, setUserSession] = useState(null);
+  const [userData, setUserData] = useState(null);
 
   useEffect(() => {
     // Check for existing session on app load
@@ -14,9 +15,16 @@ export const AuthProvider = ({ children }) => {
 
   const checkSession = async () => {
     try {
-      const sessionName = await AsyncStorage.getItem('sessionName');
+      const [sessionName, storedUserData] = await Promise.all([
+        AsyncStorage.getItem('sessionName'),
+        AsyncStorage.getItem('userData')
+      ]);
+      
       if (sessionName) {
         setUserSession(sessionName);
+        if (storedUserData) {
+          setUserData(JSON.parse(storedUserData));
+        }
       }
     } catch (error) {
       console.error('Error checking session:', error);
@@ -25,10 +33,15 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signIn = async (sessionName) => {
+  const signIn = async (authData) => {
     try {
-      await AsyncStorage.setItem('sessionName', sessionName);
+      const { sessionName, ...otherUserData } = authData['Auth User'];
+      await Promise.all([
+        AsyncStorage.setItem('sessionName', sessionName),
+        AsyncStorage.setItem('userData', JSON.stringify(otherUserData))
+      ]);
       setUserSession(sessionName);
+      setUserData(otherUserData);
     } catch (error) {
       console.error('Error storing session:', error);
       throw error;
@@ -37,8 +50,12 @@ export const AuthProvider = ({ children }) => {
 
   const signOut = async () => {
     try {
-      await AsyncStorage.removeItem('sessionName');
+      await Promise.all([
+        AsyncStorage.removeItem('sessionName'),
+        AsyncStorage.removeItem('userData')
+      ]);
       setUserSession(null);
+      setUserData(null);
     } catch (error) {
       console.error('Error removing session:', error);
     }
@@ -49,6 +66,7 @@ export const AuthProvider = ({ children }) => {
       value={{
         isLoading,
         userSession,
+        userData,
         signIn,
         signOut
       }}

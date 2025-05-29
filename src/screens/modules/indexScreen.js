@@ -72,6 +72,18 @@ const IndexScreen = ({ route, navigation }) => {
 	const renderRecordDetails = (item) => {
 		const detailFields = item.fields;
 
+
+
+		const getDisplayValue = (field) => {
+			if (field.fieldname === 'assigned_user_id' && field.userMap) {
+				return field.userMap[field.value] || field.value;
+			}
+			if (!field.value) return <Text style={styles.emptyValue}>Not set</Text>;
+			return String(field.value);
+		};
+
+		const recordId = detailFields.find(f => f.fieldname === 'id')?.value;
+
 		return (
 			<View style={styles.detailsContainer}>
 				{/* Scrollable content area */}
@@ -81,34 +93,31 @@ const IndexScreen = ({ route, navigation }) => {
 					showsVerticalScrollIndicator={true}
 					nestedScrollEnabled={true}
 				>
+
 					{detailFields.map((field, idx) => {
-						let displayValue = field.value;
-
-						if (field.fieldname === 'assigned_user_id' && field.userMap) {
-							displayValue = field.userMap[field.value] || field.value;
-						}
-
-						displayValue = displayValue === null || displayValue === undefined || displayValue === '' ?
-							<Text style={styles.emptyValue}>Not set</Text> :
-							String(displayValue);
 
 						return (
 							<View key={idx} style={styles.detailRow}>
 								<Text style={styles.detailLabel}>{field.label}:</Text>
-								<Text style={styles.detailValue}>{displayValue}</Text>
+								<Text style={styles.detailValue}>{getDisplayValue(field)}</Text>
 							</View>
 						);
 					})}
+
 				</ScrollView>
 
 				{/* Fixed Update button at the bottom */}
 				<View style={styles.fixedButtonContainer}>
+
 					<TouchableOpacity
 						style={styles.updateButton}
-						onPress={() => navigation.navigate('UserDetails', { userId: item.id })}
+						onPress={() => navigation.navigate('ViewScreen', {
+							moduleName,
+							recordId
+						})}
 					>
-						<Icon name="edit" size={18} color="#ffffff" />
-						<Text style={styles.updateButtonText}>Edit</Text>
+						<Icon name="visibility" size={18} color="#ffffff" />
+						<Text style={styles.updateButtonText}>View Details</Text>
 					</TouchableOpacity>
 				</View>
 			</View>
