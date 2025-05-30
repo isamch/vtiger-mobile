@@ -233,7 +233,8 @@ const IndexScreen = ({ route, navigation }) => {
 						<Text style={styles.title}>{moduleName}</Text>
 						<Text style={styles.subtitle}>Manage your {moduleName.toLowerCase()} records</Text>
 					</View>
-					<TouchableOpacity style={styles.addButton}>
+					<TouchableOpacity style={styles.addButton}
+						onPress={() => navigation.navigate('CreateScreen', { moduleName })}>
 						<Icon name="add" size={22} color="#ffffff" />
 						<Text style={styles.addButtonText}>New {moduleName}</Text>
 					</TouchableOpacity>
