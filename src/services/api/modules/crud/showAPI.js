@@ -6,6 +6,7 @@ export const getModuleDetails = async (moduleName, id) => {
 		const sessionName = await AsyncStorage.getItem('sessionName');
 
 
+
 		const response = await fetch(`http://10.0.2.2:8080/vtigercrm/api/modules/show.php?sessionName=${sessionName}&moduleName=${moduleName}&id=${id}`);
 
 		if (!response.ok) {
@@ -13,10 +14,9 @@ export const getModuleDetails = async (moduleName, id) => {
 		}
 		const data = await response.json();
 
-		console.log('data', data);
 
 		return data;
-		
+
 	} catch (error) {
 		console.error('Error fetching module details:', error);
 		throw error;

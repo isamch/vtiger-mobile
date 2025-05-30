@@ -84,6 +84,9 @@ const IndexScreen = ({ route, navigation }) => {
 
 		const recordId = detailFields.find(f => f.fieldname === 'id')?.value;
 
+
+
+
 		return (
 			<View style={styles.detailsContainer}>
 				{/* Scrollable content area */}
@@ -147,7 +150,7 @@ const IndexScreen = ({ route, navigation }) => {
 								<Text style={styles.avatarText}>{initial}</Text>
 							</View>
 							<Text style={styles.recordLabel}>
-								{mainLabel} {item.fields[1]?.value ? ` ${item.fields[1].value}` : ''}
+								{mainLabel} {item.fields[1]?.value && !item.fields[1]?.type?.includes('date') && !item.fields[1]?.type?.includes('time') ? ` ${item.fields[1].value}` : ''}
 							</Text>
 						</View>
 						<View style={styles.assignedToContainer}>

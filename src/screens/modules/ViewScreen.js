@@ -16,6 +16,7 @@ import Header from "../../components/Header"
 import Footer from "../../components/Footer"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import { getModuleDetails } from "../../services/api/modules/crud/showAPI"
+import RefreshableScrollView from "../../components/RefreshableScrollView"
 
 const { width } = Dimensions.get("window")
 
@@ -25,6 +26,7 @@ const ViewScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState("")
+  // const [refreshing, setRefreshing] = useState(false)
 
   const fetchDetails = async () => {
     try {
@@ -200,10 +202,11 @@ const ViewScreen = ({ route, navigation }) => {
     }
 
     return (
-      <ScrollView
+      <RefreshableScrollView
         style={styles.detailsContainer}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        onRefresh={fetchDetails}
       >
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
@@ -231,7 +234,7 @@ const ViewScreen = ({ route, navigation }) => {
             </View>
           )}
         </View>
-      </ScrollView>
+      </RefreshableScrollView>
     )
   }
 
@@ -251,7 +254,8 @@ const ViewScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.editButton} onPress={() => navigation.navigate('EditScreen', { moduleName, recordId })}>
+        <TouchableOpacity style={styles.editButton}
+          onPress={() => navigation.navigate('EditScreen', { moduleName, recordId })}>
           <Icon name="edit" size={20} color="#ffffff" />
           <Text style={styles.editButtonText}>Edit</Text>
         </TouchableOpacity>

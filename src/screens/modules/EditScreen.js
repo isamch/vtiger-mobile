@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import {
   View,
   Text,
@@ -20,7 +20,8 @@ import Header from "../../components/Header"
 import Footer from "../../components/Footer"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import { getModuleDetails } from "../../services/api/modules/crud/showAPI"
-// import { updateModuleRecord } from "../../services/api/modules/crud/updateAPI" // You'll need this API
+import { updateModuleRecord } from "../../services/api/modules/crud/updateAPI" // You'll need this API
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get("window")
 
@@ -35,6 +36,9 @@ const EditScreen = ({ route, navigation }) => {
   const [validationErrors, setValidationErrors] = useState({})
   const [showPicklistModal, setShowPicklistModal] = useState(false)
   const [currentPicklistField, setCurrentPicklistField] = useState(null)
+  const scrollViewRef = useRef(null)
+  const fieldRefs = useRef({})
+  const [userData, setUserData] = useState(null);
 
   const fetchDetails = async () => {
     try {
@@ -107,6 +111,22 @@ const EditScreen = ({ route, navigation }) => {
     return errors
   }
 
+  const scrollToError = () => {
+    if (Object.keys(validationErrors).length > 0) {
+      const firstErrorField = Object.keys(validationErrors)[0]
+      const fieldRef = fieldRefs.current[firstErrorField]
+      if (fieldRef && scrollViewRef.current) {
+        fieldRef.measureLayout(
+          scrollViewRef.current,
+          (x, y) => {
+            scrollViewRef.current.scrollTo({ y: y - 100, animated: true })
+          },
+          () => console.log("Failed to measure layout")
+        )
+      }
+    }
+  }
+
   const validateForm = () => {
     const errors = {}
     let isValid = true
@@ -120,38 +140,71 @@ const EditScreen = ({ route, navigation }) => {
     })
 
     setValidationErrors(errors)
+    if (!isValid) {
+      setTimeout(scrollToError, 100) // Add small delay to ensure refs are set
+    }
     return isValid
   }
 
   const handleSave = async () => {
     if (!validateForm()) {
-      Alert.alert("Validation Error", "Please fix the errors before saving.")
       return
     }
 
     try {
       setSaving(true)
 
-      // Prepare data for API
       const updateData = {}
+      
       originalData.fields.forEach((field) => {
+        updateData[field.fieldname] = ""
+        
+        // Then update with form data if changed
+        if (formData[field.fieldname] !== undefined) {
+          updateData[field.fieldname] = formData[field.fieldname]
+        }
         if (formData[field.fieldname] !== field.value) {
           updateData[field.fieldname] = formData[field.fieldname]
         }
       })
 
-      if (Object.keys(updateData).length === 0) {
-        Alert.alert("No Changes", "No changes were made to save.")
-        return
+      // Check if any values in updateData are different from original values
+      let hasChanges = false;
+      for (const [fieldname, value] of Object.entries(updateData)) {
+        const originalField = originalData.fields.find(f => f.fieldname === fieldname);
+        if (originalField && value !== originalField.value) {
+          hasChanges = true;
+          break;
+        }
       }
 
-      // TODO: Implement the actual update API call
-      // await updateModuleRecord(moduleName, recordId, updateData)
+      if (!hasChanges) {
+        Alert.alert("No Changes", "No changes were made to save.");
+        return;
+      }
+
+
+      // Get current user data for modifiedby field
+      const userData = JSON.parse(await AsyncStorage.getItem('userData'));
+      setUserData(userData);
+      
+
+      // Set modifiedby field to current user id
+      if (userData && userData.userId) {
+        updateData.modifiedby = userData.userId;
+      }
+
+      // Set modifiedtime field to current date/time
+      updateData.modifiedtime = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+
+      // Call the update API
+      await updateModuleRecord(moduleName, recordId, updateData)
 
       Alert.alert("Success", "Record updated successfully!", [
         {
           text: "OK",
-          onPress: () => navigation.goBack(),
+          onPress: () => navigation.navigate('ViewScreen', { moduleName, recordId }),
         },
       ])
     } catch (e) {
@@ -181,6 +234,25 @@ const EditScreen = ({ route, navigation }) => {
     const value = formData[field.fieldname] || ""
     const hasError = validationErrors[field.fieldname]
 
+    const readOnlyFields = ['modifiedby', 'createdtime', 'modifiedtime', 'id'];
+    
+    // const readOnlyLabels = {
+    //   'modifiedby': 'Not modified',
+    //   'createdtime': 'Not created', 
+    //   'modifiedtime': 'Not modified',
+    //   'id': 'No id'
+    // };
+
+    if (readOnlyFields.includes(field.fieldname)) {
+      return (
+        <View style={[styles.input, { backgroundColor: '#f1f5f9' }]}>
+          <Text style={{ color: '#64748b' }}>
+            {value || "empty"}
+          </Text>
+        </View>
+      );
+    }
+
     switch (field.type) {
       case "boolean":
         return (
@@ -188,7 +260,7 @@ const EditScreen = ({ route, navigation }) => {
             <Switch
               value={value === "1" || value === true}
               onValueChange={(newValue) => updateFieldValue(field.fieldname, newValue ? "1" : "0")}
-              trackColor={{ false: "#e2e8f0", true: "#6366f1" }}
+              trackColor={{ false: "#e2e8f0", true: "#2196F3" }}
               thumbColor={value === "1" ? "#ffffff" : "#f1f5f9"}
             />
             <Text style={styles.switchLabel}>{value === "1" || value === true ? "Yes" : "No"}</Text>
@@ -333,10 +405,14 @@ const EditScreen = ({ route, navigation }) => {
     const hasError = validationErrors[field.fieldname]
 
     return (
-      <View key={index} style={[styles.fieldCard, hasError && styles.fieldCardError]}>
+      <View 
+        key={index} 
+        style={[styles.fieldCard, hasError && styles.fieldCardError]}
+        ref={ref => fieldRefs.current[field.fieldname] = ref}
+      >
         <View style={styles.fieldHeader}>
           <View style={styles.fieldIconContainer}>
-            <Icon name={getFieldIcon(field.type)} size={18} color="#6366f1" />
+            <Icon name={getFieldIcon(field.type)} size={18} color="#2196F3" />
           </View>
           <View style={styles.fieldInfo}>
             <Text style={styles.fieldLabel}>
@@ -423,7 +499,7 @@ const EditScreen = ({ route, navigation }) => {
                 >
                   <Text style={styles.modalOptionText}>{optionLabel}</Text>
                   {formData[currentPicklistField?.fieldname] === optionValue && (
-                    <Icon name="check" size={20} color="#6366f1" />
+                    <Icon name="check" size={20} color="#2196F3" />
                   )}
                 </TouchableOpacity>
               )
@@ -439,7 +515,7 @@ const EditScreen = ({ route, navigation }) => {
       return (
         <View style={styles.loaderContainer}>
           <View style={styles.loaderCard}>
-            <ActivityIndicator size="large" color="#6366f1" />
+            <ActivityIndicator size="large" color="#2196F3" />
             <Text style={styles.loaderText}>Loading form...</Text>
             <Text style={styles.loaderSubtext}>Please wait while we prepare the form</Text>
           </View>
@@ -483,6 +559,7 @@ const EditScreen = ({ route, navigation }) => {
 
     return (
       <ScrollView
+        ref={scrollViewRef}
         style={styles.detailsContainer}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -604,7 +681,7 @@ const styles = StyleSheet.create({
   saveButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#10b981",
+    backgroundColor: "#2196F3",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
@@ -651,7 +728,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#6366f1",
+    color: "#2196F3",
   },
   statLabel: {
     fontSize: 12,

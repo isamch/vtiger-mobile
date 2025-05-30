@@ -4,13 +4,7 @@ export const updateModuleRecord = async (moduleName, recordId, formData) => {
   try {
     const sessionName = await AsyncStorage.getItem('sessionName');
     
-    console.log(
-      [
-        "moduleName", moduleName,
-        "recordId", recordId,
-        "formData", formData
-      ]
-    )
+ 
     
     const response = await fetch(`http://10.0.2.2:8080/vtigercrm/api/modules/update.php`, {
       method: 'PUT',
