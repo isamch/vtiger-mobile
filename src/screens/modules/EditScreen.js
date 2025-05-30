@@ -1,6 +1,4 @@
-"use client"
-
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState } from "react"
 import {
   View,
   Text,
@@ -15,13 +13,17 @@ import {
   Alert,
   Modal,
   FlatList,
+  Image,
 } from "react-native"
 import Header from "../../components/Header"
 import Footer from "../../components/Footer"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import { getModuleDetails } from "../../services/api/modules/crud/showAPI"
-import { updateModuleRecord } from "../../services/api/modules/crud/updateAPI" // You'll need this API
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { updateModuleRecord } from "../../services/api/modules/crud/updateAPI"
+
+import * as ImagePicker from 'expo-image-picker'
+import * as DocumentPicker from 'expo-document-picker'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 const { width } = Dimensions.get("window")
 
@@ -36,9 +38,10 @@ const EditScreen = ({ route, navigation }) => {
   const [validationErrors, setValidationErrors] = useState({})
   const [showPicklistModal, setShowPicklistModal] = useState(false)
   const [currentPicklistField, setCurrentPicklistField] = useState(null)
-  const scrollViewRef = useRef(null)
-  const fieldRefs = useRef({})
-  const [userData, setUserData] = useState(null);
+  const [showImageModal, setShowImageModal] = useState(false)
+  const [currentImageField, setCurrentImageField] = useState(null)
+  const [selectedFiles, setSelectedFiles] = useState({})
+  const [userData, setUserData] = useState(null)
 
   const fetchDetails = async () => {
     try {
@@ -67,7 +70,18 @@ const EditScreen = ({ route, navigation }) => {
   }
 
   useEffect(() => {
-    fetchDetails()
+    // Request permissions when the screen loads
+    const requestPermissions = async () => {
+      const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
+      const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (cameraStatus !== 'granted' || libraryStatus !== 'granted') {
+        console.log('Some permissions were not granted');
+      }
+    };
+
+    // requestPermissions();
+    fetchDetails();
   }, [moduleName, recordId])
 
   const getFieldIcon = (fieldType) => {
@@ -111,22 +125,6 @@ const EditScreen = ({ route, navigation }) => {
     return errors
   }
 
-  const scrollToError = () => {
-    if (Object.keys(validationErrors).length > 0) {
-      const firstErrorField = Object.keys(validationErrors)[0]
-      const fieldRef = fieldRefs.current[firstErrorField]
-      if (fieldRef && scrollViewRef.current) {
-        fieldRef.measureLayout(
-          scrollViewRef.current,
-          (x, y) => {
-            scrollViewRef.current.scrollTo({ y: y - 100, animated: true })
-          },
-          () => console.log("Failed to measure layout")
-        )
-      }
-    }
-  }
-
   const validateForm = () => {
     const errors = {}
     let isValid = true
@@ -140,11 +138,9 @@ const EditScreen = ({ route, navigation }) => {
     })
 
     setValidationErrors(errors)
-    if (!isValid) {
-      setTimeout(scrollToError, 100) // Add small delay to ensure refs are set
-    }
     return isValid
   }
+
 
   const handleSave = async () => {
     if (!validateForm()) {
@@ -155,10 +151,10 @@ const EditScreen = ({ route, navigation }) => {
       setSaving(true)
 
       const updateData = {}
-      
+
       originalData.fields.forEach((field) => {
         updateData[field.fieldname] = ""
-        
+
         // Then update with form data if changed
         if (formData[field.fieldname] !== undefined) {
           updateData[field.fieldname] = formData[field.fieldname]
@@ -187,7 +183,7 @@ const EditScreen = ({ route, navigation }) => {
       // Get current user data for modifiedby field
       const userData = JSON.parse(await AsyncStorage.getItem('userData'));
       setUserData(userData);
-      
+
 
       // Set modifiedby field to current user id
       if (userData && userData.userId) {
@@ -234,8 +230,9 @@ const EditScreen = ({ route, navigation }) => {
     const value = formData[field.fieldname] || ""
     const hasError = validationErrors[field.fieldname]
 
+
     const readOnlyFields = ['modifiedby', 'createdtime', 'modifiedtime', 'id'];
-    
+
     // const readOnlyLabels = {
     //   'modifiedby': 'Not modified',
     //   'createdtime': 'Not created', 
@@ -253,6 +250,7 @@ const EditScreen = ({ route, navigation }) => {
       );
     }
 
+
     switch (field.type) {
       case "boolean":
         return (
@@ -260,7 +258,7 @@ const EditScreen = ({ route, navigation }) => {
             <Switch
               value={value === "1" || value === true}
               onValueChange={(newValue) => updateFieldValue(field.fieldname, newValue ? "1" : "0")}
-              trackColor={{ false: "#e2e8f0", true: "#2196F3" }}
+              trackColor={{ false: "#e2e8f0", true: "#6366f1" }}
               thumbColor={value === "1" ? "#ffffff" : "#f1f5f9"}
             />
             <Text style={styles.switchLabel}>{value === "1" || value === true ? "Yes" : "No"}</Text>
@@ -405,14 +403,10 @@ const EditScreen = ({ route, navigation }) => {
     const hasError = validationErrors[field.fieldname]
 
     return (
-      <View 
-        key={index} 
-        style={[styles.fieldCard, hasError && styles.fieldCardError]}
-        ref={ref => fieldRefs.current[field.fieldname] = ref}
-      >
+      <View key={index} style={[styles.fieldCard, hasError && styles.fieldCardError]}>
         <View style={styles.fieldHeader}>
           <View style={styles.fieldIconContainer}>
-            <Icon name={getFieldIcon(field.type)} size={18} color="#2196F3" />
+            <Icon name={getFieldIcon(field.type)} size={18} color="#6366f1" />
           </View>
           <View style={styles.fieldInfo}>
             <Text style={styles.fieldLabel}>
@@ -466,58 +460,19 @@ const EditScreen = ({ route, navigation }) => {
     </View>
   )
 
-  const renderPicklistModal = () => (
-    <Modal
-      visible={showPicklistModal}
-      transparent
-      animationType="slide"
-      onRequestClose={() => setShowPicklistModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select {currentPicklistField?.label}</Text>
-            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setShowPicklistModal(false)}>
-              <Icon name="close" size={24} color="#64748b" />
-            </TouchableOpacity>
-          </View>
 
-          <FlatList
-            data={currentPicklistField?.options || []}
-            keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item }) => {
-              const optionValue = typeof item === "object" ? item.value : item
-              const optionLabel = typeof item === "object" ? item.label : item
-
-              return (
-                <TouchableOpacity
-                  style={styles.modalOption}
-                  onPress={() => {
-                    updateFieldValue(currentPicklistField.fieldname, optionValue)
-                    setShowPicklistModal(false)
-                  }}
-                >
-                  <Text style={styles.modalOptionText}>{optionLabel}</Text>
-                  {formData[currentPicklistField?.fieldname] === optionValue && (
-                    <Icon name="check" size={20} color="#2196F3" />
-                  )}
-                </TouchableOpacity>
-              )
-            }}
-          />
-        </View>
-      </View>
-    </Modal>
-  )
 
   const renderContent = () => {
     if (loading) {
       return (
-        <View style={styles.loaderContainer}>
-          <View style={styles.loaderCard}>
-            <ActivityIndicator size="large" color="#2196F3" />
-            <Text style={styles.loaderText}>Loading form...</Text>
-            <Text style={styles.loaderSubtext}>Please wait while we prepare the form</Text>
+        <View style={styles.container}>
+          {renderSearchBar()}
+          <View style={styles.loaderContainer}>
+            <View style={styles.loaderCard}>
+              <ActivityIndicator size="large" color="#6366f1" />
+              <Text style={styles.loaderText}>Loading form...</Text>
+              <Text style={styles.loaderSubtext}>Please wait while we prepare the form</Text>
+            </View>
           </View>
         </View>
       )
@@ -559,7 +514,6 @@ const EditScreen = ({ route, navigation }) => {
 
     return (
       <ScrollView
-        ref={scrollViewRef}
         style={styles.detailsContainer}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -624,7 +578,6 @@ const EditScreen = ({ route, navigation }) => {
 
       <View style={styles.content}>{renderContent()}</View>
 
-      {renderPicklistModal()}
 
       <Footer navigation={navigation} />
     </View>
@@ -681,7 +634,7 @@ const styles = StyleSheet.create({
   saveButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#2196F3",
+    backgroundColor: "#10b981",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
@@ -728,7 +681,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#2196F3",
+    color: "#6366f1",
   },
   statLabel: {
     fontSize: 12,
@@ -871,26 +824,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   searchContainer: {
-    backgroundColor: "#ffffff",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+  },
+  searchInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
-  },
-  searchInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f8fafc",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
   },
   searchIcon: {
     marginRight: 12,
@@ -954,7 +904,7 @@ const styles = StyleSheet.create({
   },
   loaderContainer: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "start",
     alignItems: "center",
     padding: 20,
   },
@@ -968,7 +918,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 4,
-    width: width * 0.8,
+    width: width * 0.9,
   },
   loaderText: {
     marginTop: 20,
@@ -1086,6 +1036,123 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#64748b",
     textAlign: "center",
+  },
+  fileButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: "#ffffff",
+  },
+  fileButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  fileButtonText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  fileButtonTitle: {
+    fontSize: 16,
+    color: "#1e293b",
+    fontWeight: "500",
+  },
+  fileButtonSubtitle: {
+    fontSize: 14,
+    color: "#64748b",
+    marginTop: 2,
+  },
+  filePreview: {
+    marginTop: 12,
+    borderRadius: 12,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    position: "relative",
+  },
+  imagePreview: {
+    width: "100%",
+    height: 200,
+    borderRadius: 12,
+  },
+  fileInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+  },
+  fileDetails: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  fileName: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#1e293b",
+  },
+  fileSize: {
+    fontSize: 14,
+    color: "#64748b",
+    marginTop: 2,
+  },
+  removeFileButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    padding: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  imageModalContent: {
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 20,
+  },
+  imageOptionsContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 16,
+  },
+  imageOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: "#f8fafc",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  imageOptionIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#f0f4ff",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  imageOptionTextContainer: {
+    flex: 1,
+  },
+  imageOptionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#1e293b",
+  },
+  imageOptionSubtitle: {
+    fontSize: 14,
+    color: "#64748b",
+    marginTop: 2,
   },
 })
 

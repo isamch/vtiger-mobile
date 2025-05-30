@@ -26,7 +26,6 @@ const ViewScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState("")
-  // const [refreshing, setRefreshing] = useState(false)
 
   const fetchDetails = async () => {
     try {
@@ -157,11 +156,14 @@ const ViewScreen = ({ route, navigation }) => {
   const renderContent = () => {
     if (loading) {
       return (
-        <View style={styles.loaderContainer}>
-          <View style={styles.loaderCard}>
-            <ActivityIndicator size="large" color="#6366f1" />
-            <Text style={styles.loaderText}>Loading details...</Text>
-            <Text style={styles.loaderSubtext}>Please wait while we fetch the data</Text>
+        <View style={styles.container}>
+          {renderSearchBar()}
+          <View style={styles.loaderContainer}>
+            <View style={styles.loaderCard}>
+              <ActivityIndicator size="large" color="#6366f1" />
+              <Text style={styles.loaderText}>Loading details...</Text>
+              <Text style={styles.loaderSubtext}>Please wait while we fetch the data</Text>
+            </View>
           </View>
         </View>
       )
@@ -444,7 +446,7 @@ const styles = StyleSheet.create({
   },
   loaderContainer: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "start",
     alignItems: "center",
     padding: 20,
   },
@@ -458,7 +460,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 4,
-    width: width * 0.8,
+    width: width * 0.9,
   },
   loaderText: {
     marginTop: 20,
@@ -574,26 +576,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   searchContainer: {
-    backgroundColor: "#ffffff",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   searchInputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#ffffff",
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: "#e2e8f0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   searchIcon: {
     marginRight: 12,
