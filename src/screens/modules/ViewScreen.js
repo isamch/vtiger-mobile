@@ -52,13 +52,14 @@ const ViewScreen = ({ route, navigation }) => {
 
   const getFieldIcon = (fieldType) => {
     const iconMap = {
-      email: "email",
+      email: "email", 
       phone: "phone",
       date: "event",
       datetime: "schedule",
+      time: "access-time",
       boolean: "check-circle",
       reference: "link",
-      owner: "person",
+      owner: "person", 
       text: "description",
       string: "text-fields",
       picklist: "list",
@@ -84,6 +85,12 @@ const ViewScreen = ({ route, navigation }) => {
         return new Date(field.value).toLocaleDateString()
       case "datetime":
         return new Date(field.value).toLocaleString()
+      case "time":
+        // Convert UTC time string to local time
+        const [hours, minutes] = field.value.split(':');
+        const utcDate = new Date();
+        utcDate.setUTCHours(hours, minutes, 0);
+        return utcDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
       case "email":
         return field.value
       default:

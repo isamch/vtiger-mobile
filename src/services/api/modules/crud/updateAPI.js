@@ -3,9 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const updateModuleRecord = async (moduleName, recordId, formData) => {
   try {
     const sessionName = await AsyncStorage.getItem('sessionName');
-    
- 
-    
+
+    console.log(
+      'formData', formData
+    )
+
     const response = await fetch(`http://10.0.2.2:8080/vtigercrm/api/modules/update.php`, {
       method: 'PUT',
       headers: {

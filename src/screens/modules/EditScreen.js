@@ -14,6 +14,7 @@ import {
   Modal,
   FlatList,
   Image,
+  Platform,
 } from "react-native"
 import Header from "../../components/Header"
 import Footer from "../../components/Footer"
@@ -21,8 +22,39 @@ import Icon from "react-native-vector-icons/MaterialIcons"
 import { getModuleDetails } from "../../services/api/modules/crud/showAPI"
 import { updateModuleRecord } from "../../services/api/modules/crud/updateAPI"
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import DateTimePicker from '@react-native-community/datetimepicker'
 
 const { width } = Dimensions.get("window")
+
+// Add utility functions at the top level after imports
+const convertUTCToLocal = (utcTimeStr) => {
+  if (!utcTimeStr) return '';
+  
+  // Create a date object for today with the UTC time
+  const today = new Date();
+  const [hours, minutes, seconds] = utcTimeStr.split(':');
+  const utcDate = new Date(Date.UTC(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+    parseInt(hours),
+    parseInt(minutes),
+    parseInt(seconds)
+  ));
+
+  return utcDate.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
+const convertLocalToUTC = (localDate) => {
+  const hours = localDate.getUTCHours().toString().padStart(2, '0');
+  const minutes = localDate.getUTCMinutes().toString().padStart(2, '0');
+  const seconds = localDate.getUTCSeconds().toString().padStart(2, '0');
+  return `${hours}:${minutes}:${seconds}`;
+};
 
 const EditScreen = ({ route, navigation }) => {
   const { moduleName, recordId } = route.params
@@ -35,7 +67,12 @@ const EditScreen = ({ route, navigation }) => {
   const [validationErrors, setValidationErrors] = useState({})
   const [showPicklistModal, setShowPicklistModal] = useState(false)
   const [currentPicklistField, setCurrentPicklistField] = useState(null)
-  
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [showTimePicker, setShowTimePicker] = useState(false)
+  const [currentDateField, setCurrentDateField] = useState(null)
+  const [datePickerMode, setDatePickerMode] = useState('date')
+  const [tempDateTime, setTempDateTime] = useState(new Date())
+
   const [userData, setUserData] = useState(null)
 
   const fetchDetails = async () => {
@@ -128,6 +165,62 @@ const EditScreen = ({ route, navigation }) => {
     return isValid
   }
 
+  const formatTime = (date) => {
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    const seconds = String(date.getSeconds()).padStart(2, '0')
+    return `${hours}:${minutes}:${seconds}`
+  }
+
+  const formatDate = (date, includeTime = false) => {
+    if (!date) return ''
+    const d = new Date(date)
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    if (!includeTime) {
+      return `${year}-${month}-${day}`
+    }
+    return `${year}-${month}-${day} ${formatTime(d)}`
+  }
+
+  const onDateChange = (event, selectedDate) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false)
+      setShowTimePicker(false)
+    }
+
+    if (event.type === 'dismissed') {
+      setShowDatePicker(false)
+      setShowTimePicker(false)
+      return
+    }
+
+    if (selectedDate) {
+      setTempDateTime(selectedDate)
+
+      if (currentDateField?.type === 'datetime' && datePickerMode === 'date' && Platform.OS === 'android') {
+        setDatePickerMode('time')
+        setShowTimePicker(true)
+        return
+      }
+
+      // Handle time fields differently
+      if (currentDateField?.type === 'time') {
+        const utcTime = convertLocalToUTC(selectedDate)
+        updateFieldValue(currentDateField?.fieldname, utcTime)
+      } else if (datePickerMode === 'time' || currentDateField?.type === 'date') {
+        // For other date/datetime fields
+        const formattedDate = formatDate(selectedDate, currentDateField?.type === 'datetime')
+        updateFieldValue(currentDateField?.fieldname, formattedDate)
+      }
+    }
+
+    if (Platform.OS === 'ios') {
+      setShowDatePicker(false)
+      setShowTimePicker(false)
+    }
+  }
 
   const handleSave = async () => {
     if (!validateForm()) {
@@ -282,25 +375,91 @@ const EditScreen = ({ route, navigation }) => {
 
       case "date":
         return (
-          <TextInput
-            style={[styles.input, hasError && styles.inputError]}
-            value={value}
-            onChangeText={(text) => updateFieldValue(field.fieldname, text)}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor="#94a3b8"
-          />
+          <TouchableOpacity
+            style={[styles.picklistButton, hasError && styles.inputError]}
+            onPress={() => {
+              setCurrentDateField(field)
+              setDatePickerMode('date')
+              setTempDateTime(value ? new Date(value) : new Date())
+              setShowDatePicker(true)
+            }}
+          >
+            <Text style={[styles.picklistText, !value && styles.placeholderText]}>
+              {value || 'Select date'}
+            </Text>
+            <Icon name="event" size={24} color="#64748b" />
+          </TouchableOpacity>
         )
 
+      case "time":
+        return (
+          <TouchableOpacity
+            style={[styles.picklistButton, hasError && styles.inputError]}
+            onPress={() => {
+              setCurrentDateField(field)
+              setDatePickerMode('time')
+              
+              // Parse the UTC time and convert to local Date object
+              let timeToUse = new Date()
+              if (value) {
+                const [hours, minutes, seconds] = value.split(':')
+                timeToUse = new Date(Date.UTC(
+                  timeToUse.getFullYear(),
+                  timeToUse.getMonth(),
+                  timeToUse.getDate(),
+                  parseInt(hours),
+                  parseInt(minutes),
+                  parseInt(seconds)
+                ))
+              }
+              
+              setTempDateTime(timeToUse)
+              setShowTimePicker(true)
+            }}
+          >
+            <Text style={[styles.picklistText, !value && styles.placeholderText]}>
+              {value ? convertUTCToLocal(value) : 'Select time'}
+            </Text>
+            <Icon name="schedule" size={24} color="#64748b" />
+          </TouchableOpacity>
+        )
+        
       case "datetime":
         return (
-          <TextInput
-            style={[styles.input, hasError && styles.inputError]}
-            value={value}
-            onChangeText={(text) => updateFieldValue(field.fieldname, text)}
-            placeholder="YYYY-MM-DD HH:MM:SS"
-            placeholderTextColor="#94a3b8"
-          />
+          <View>
+            <TouchableOpacity
+              style={[styles.picklistButton, hasError && styles.inputError, { marginBottom: 8 }]}
+              onPress={() => {
+                setCurrentDateField(field)
+                setDatePickerMode('date')
+                setTempDateTime(value ? new Date(value) : new Date())
+                setShowDatePicker(true)
+              }}
+            >
+              <Text style={[styles.picklistText, !value && styles.placeholderText]}>
+                {value ? value.split(' ')[0] : 'Select date'}
+              </Text>
+              <Icon name="event" size={24} color="#64748b" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.picklistButton, hasError && styles.inputError]}
+              onPress={() => {
+                setCurrentDateField(field)
+                setDatePickerMode('time')
+                setTempDateTime(value ? new Date(value) : new Date())
+                setShowTimePicker(true)
+              }}
+            >
+              <Text style={[styles.picklistText, !value && styles.placeholderText]}>
+                {value ? value.split(' ')[1] || 'Select time' : 'Select time'}
+              </Text>
+              <Icon name="schedule" size={24} color="#64748b" />
+            </TouchableOpacity>
+          </View>
         )
+
+
 
       case "email":
         return (
@@ -437,12 +596,17 @@ const EditScreen = ({ route, navigation }) => {
     if (currentPicklistField.type === 'owner' && currentPicklistField.options && currentPicklistField.userMap) {
       // For owner type, create options from userMap
       options = currentPicklistField.options.map(optionId => ({
+        id: optionId.toString(),
         value: optionId,
         label: currentPicklistField.userMap[optionId] || optionId
       }));
-    } else if (currentPicklistField.type === 'picklist') {
+    } else if (currentPicklistField.type === 'picklist' && Array.isArray(currentPicklistField.options)) {
       // For regular picklist
-      options = currentPicklistField.options || [];
+      options = currentPicklistField.options.map(option => ({
+        id: option.toString(),
+        value: option,
+        label: option
+      }));
     }
 
     return (
@@ -466,7 +630,7 @@ const EditScreen = ({ route, navigation }) => {
 
             <FlatList
               data={options}
-              keyExtractor={(item) => item.value}
+              keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
@@ -497,6 +661,20 @@ const EditScreen = ({ route, navigation }) => {
           </View>
         </View>
       </Modal>
+    );
+  };
+
+  const renderDatePicker = () => {
+    if (!showDatePicker && !showTimePicker) return null;
+
+    return (
+      <DateTimePicker
+        value={tempDateTime}
+        mode={datePickerMode}
+        is24Hour={true}
+        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+        onChange={onDateChange}
+      />
     );
   };
 
@@ -617,6 +795,7 @@ const EditScreen = ({ route, navigation }) => {
       <View style={styles.content}>{renderContent()}</View>
 
       {renderPicklistModal()}
+      {renderDatePicker()}
 
       <Footer navigation={navigation} />
     </View>
