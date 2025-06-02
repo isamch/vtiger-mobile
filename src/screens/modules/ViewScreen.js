@@ -17,6 +17,7 @@ import Footer from "../../components/Footer"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import { getModuleDetails } from "../../services/api/modules/crud/showAPI"
 import RefreshableScrollView from "../../components/RefreshableScrollView"
+import { convertUTCToLocal, formatDate } from "../../utils/dateTimeUtils"
 
 const { width } = Dimensions.get("window")
 
@@ -82,21 +83,31 @@ const ViewScreen = ({ route, navigation }) => {
       case "boolean":
         return field.value === "1" ? "Yes" : "No"
       case "date":
-        return new Date(field.value).toLocaleDateString()
+        return formatDate(field.value)
       case "datetime":
-        return new Date(field.value).toLocaleString()
+        const utcString = field.value?.replace(' ', 'T') + 'Z'; 
+        const date = new Date(utcString); 
+        if (isNaN(date.getTime())) {
+          return String(field.value); 
+        }
+        return date.toLocaleString(undefined, {
+          year: 'numeric',    
+          month: 'long',      
+          day: 'numeric',     
+          hour: '2-digit',    
+          minute: '2-digit',  
+          hour12: true        
+        });
       case "time":
-        // Convert UTC time string to local time
-        const [hours, minutes] = field.value.split(':');
-        const utcDate = new Date();
-        utcDate.setUTCHours(hours, minutes, 0);
-        return utcDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        return convertUTCToLocal(field.value)
       case "email":
         return field.value
       default:
         return String(field.value)
     }
   }
+
+  
 
   const filteredFields =
     data?.fields?.filter((field) => {

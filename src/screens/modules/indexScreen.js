@@ -5,6 +5,7 @@ import Footer from '../../components/Footer';
 import { getModuleData } from '../../services/api/modules/crud/indexAPI';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import RefreshableScrollView from '../../components/RefreshableScrollView';
+import { convertUTCToLocal, formatDate } from '../../utils/dateTimeUtils';
 
 const IndexScreen = ({ route, navigation }) => {
 	const { moduleName } = route.params;
@@ -72,20 +73,55 @@ const IndexScreen = ({ route, navigation }) => {
 	const renderRecordDetails = (item) => {
 		const detailFields = item.fields;
 
-
-
 		const getDisplayValue = (field) => {
 			if (field.fieldname === 'assigned_user_id' && field.userMap) {
 				return field.userMap[field.value] || field.value;
 			}
 			if (!field.value) return <Text style={styles.emptyValue}>Not set</Text>;
+
+			// Handle date and time fields
+			if (field.type && (field.type.includes('date') || field.type.includes('time') || field.type.includes('datetime'))) {
+				try {
+					// For time-only fields that come in "HH:MM:SS" format
+					if (field.type.includes('time') && !field.type.includes('date')) {
+						console.log(field.value);
+						return convertUTCToLocal(field.value);
+					}
+
+
+					// For datetime fields
+					if (field.type.includes('datetime')) {
+						const utcString = field.value?.replace(' ', 'T') + 'Z'; 
+						const date = new Date(utcString); 
+						if (isNaN(date.getTime())) {
+							return String(field.value); 
+						}
+						return date.toLocaleString(undefined, {
+							year: 'numeric',    
+							month: 'long',      
+							day: 'numeric',     
+							hour: '2-digit',    
+							minute: '2-digit',  
+							hour12: true        
+						});
+					}
+
+
+					// For date-only fields
+					if (field.type.includes('date')) {
+						return formatDate(field.value);
+					}
+
+					return String(field.value);
+				} catch (error) {
+					return String(field.value);
+				}
+			}
+
 			return String(field.value);
 		};
 
 		const recordId = detailFields.find(f => f.fieldname === 'id')?.value;
-
-
-
 
 		return (
 			<View style={styles.detailsContainer}>
@@ -492,7 +528,7 @@ const styles = StyleSheet.create({
 
 	detailsContainer: {
 		backgroundColor: '#f3f4f6',
-		height: 600,
+		height: 'auto',
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
 		marginBottom: 8,

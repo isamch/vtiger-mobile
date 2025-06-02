@@ -23,38 +23,9 @@ import { getModuleDetails } from "../../services/api/modules/crud/showAPI"
 import { updateModuleRecord } from "../../services/api/modules/crud/updateAPI"
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import DateTimePicker from '@react-native-community/datetimepicker'
+import { convertUTCToLocal, convertLocalToUTC, formatDate, convertDateTimeToUTC } from "../../utils/dateTimeUtils"
 
 const { width } = Dimensions.get("window")
-
-// Add utility functions at the top level after imports
-const convertUTCToLocal = (utcTimeStr) => {
-  if (!utcTimeStr) return '';
-  
-  // Create a date object for today with the UTC time
-  const today = new Date();
-  const [hours, minutes, seconds] = utcTimeStr.split(':');
-  const utcDate = new Date(Date.UTC(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-    parseInt(hours),
-    parseInt(minutes),
-    parseInt(seconds)
-  ));
-
-  return utcDate.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  });
-};
-
-const convertLocalToUTC = (localDate) => {
-  const hours = localDate.getUTCHours().toString().padStart(2, '0');
-  const minutes = localDate.getUTCMinutes().toString().padStart(2, '0');
-  const seconds = localDate.getUTCSeconds().toString().padStart(2, '0');
-  return `${hours}:${minutes}:${seconds}`;
-};
 
 const EditScreen = ({ route, navigation }) => {
   const { moduleName, recordId } = route.params
@@ -72,6 +43,18 @@ const EditScreen = ({ route, navigation }) => {
   const [currentDateField, setCurrentDateField] = useState(null)
   const [datePickerMode, setDatePickerMode] = useState('date')
   const [tempDateTime, setTempDateTime] = useState(new Date())
+
+  // Add array of fields to hide
+  const hiddenFields = [
+    // 'createdtime',
+    // 'modifiedtime',
+    // 'created_user_id',
+    // 'modifiedby',
+    // 'source',
+    // 'starred',
+    'tags',
+    'id'
+  ]
 
   const [userData, setUserData] = useState(null)
 
@@ -102,8 +85,6 @@ const EditScreen = ({ route, navigation }) => {
   }
 
   useEffect(() => {
-
-
     // requestPermissions();
     fetchDetails();
   }, [moduleName, recordId])
@@ -205,13 +186,20 @@ const EditScreen = ({ route, navigation }) => {
         return
       }
 
-      // Handle time fields differently
+      // Handle different field types
       if (currentDateField?.type === 'time') {
+        // Convert the selected local time to UTC before saving
         const utcTime = convertLocalToUTC(selectedDate)
         updateFieldValue(currentDateField?.fieldname, utcTime)
-      } else if (datePickerMode === 'time' || currentDateField?.type === 'date') {
-        // For other date/datetime fields
-        const formattedDate = formatDate(selectedDate, currentDateField?.type === 'datetime')
+      } else if (currentDateField?.type === 'datetime') {
+        if (datePickerMode === 'time' || Platform.OS === 'ios') {
+          // Convert the entire datetime to UTC
+          const utcDateTime = convertDateTimeToUTC(selectedDate)
+          updateFieldValue(currentDateField?.fieldname, utcDateTime)
+        }
+      } else if (currentDateField?.type === 'date') {
+        // For date-only fields, use local date format
+        const formattedDate = formatDate(selectedDate)
         updateFieldValue(currentDateField?.fieldname, formattedDate)
       }
     }
@@ -310,26 +298,33 @@ const EditScreen = ({ route, navigation }) => {
     const value = formData[field.fieldname] || ""
     const hasError = validationErrors[field.fieldname]
 
-
     const readOnlyFields = ['modifiedby', 'createdtime', 'modifiedtime', 'id'];
 
-    // const readOnlyLabels = {
-    //   'modifiedby': 'Not modified',
-    //   'createdtime': 'Not created', 
-    //   'modifiedtime': 'Not modified',
-    //   'id': 'No id'
-    // };
-
     if (readOnlyFields.includes(field.fieldname)) {
+      let displayValue = value || 'empty';
+    
+      if ((field.fieldname === 'createdtime' || field.fieldname === 'modifiedtime') && value) {
+        const date = new Date(value.replace(' ', 'T') + 'Z'); 
+        displayValue = date.toLocaleString(undefined, {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false 
+        });
+      }
+    
       return (
         <View style={[styles.input, { backgroundColor: '#f1f5f9' }]}>
           <Text style={{ color: '#64748b' }}>
-            {value || "empty"}
+            {displayValue}
           </Text>
         </View>
       );
     }
-
+    
 
     switch (field.type) {
       case "boolean":
@@ -399,18 +394,15 @@ const EditScreen = ({ route, navigation }) => {
               setCurrentDateField(field)
               setDatePickerMode('time')
               
-              // Parse the UTC time and convert to local Date object
+              // Create a Date object with the local time
               let timeToUse = new Date()
               if (value) {
+                // Convert UTC time to local Date object
                 const [hours, minutes, seconds] = value.split(':')
-                timeToUse = new Date(Date.UTC(
-                  timeToUse.getFullYear(),
-                  timeToUse.getMonth(),
-                  timeToUse.getDate(),
-                  parseInt(hours),
-                  parseInt(minutes),
-                  parseInt(seconds)
-                ))
+                timeToUse = new Date()
+                timeToUse.setUTCHours(parseInt(hours, 10))
+                timeToUse.setUTCMinutes(parseInt(minutes, 10))
+                timeToUse.setUTCSeconds(parseInt(seconds, 10))
               }
               
               setTempDateTime(timeToUse)
@@ -425,6 +417,7 @@ const EditScreen = ({ route, navigation }) => {
         )
         
       case "datetime":
+        const [dateValue, timeValue] = value ? value.split(' ') : ['', '']
         return (
           <View>
             <TouchableOpacity
@@ -436,8 +429,8 @@ const EditScreen = ({ route, navigation }) => {
                 setShowDatePicker(true)
               }}
             >
-              <Text style={[styles.picklistText, !value && styles.placeholderText]}>
-                {value ? value.split(' ')[0] : 'Select date'}
+              <Text style={[styles.picklistText, !dateValue && styles.placeholderText]}>
+                {dateValue || 'Select date'}
               </Text>
               <Icon name="event" size={24} color="#64748b" />
             </TouchableOpacity>
@@ -451,15 +444,13 @@ const EditScreen = ({ route, navigation }) => {
                 setShowTimePicker(true)
               }}
             >
-              <Text style={[styles.picklistText, !value && styles.placeholderText]}>
-                {value ? value.split(' ')[1] || 'Select time' : 'Select time'}
+              <Text style={[styles.picklistText, !timeValue && styles.placeholderText]}>
+                {timeValue ? convertUTCToLocal(timeValue) : 'Select time'}
               </Text>
               <Icon name="schedule" size={24} color="#64748b" />
             </TouchableOpacity>
           </View>
         )
-
-
 
       case "email":
         return (
@@ -519,13 +510,19 @@ const EditScreen = ({ route, navigation }) => {
 
   const filteredFields =
     originalData?.fields?.filter((field) => {
-      if (!searchQuery.trim()) return true
+      // First filter out hidden fields
+      if (hiddenFields.includes(field.fieldname)) {
+        return false;
+      }
 
-      const query = searchQuery.toLowerCase()
-      const labelMatch = field.label?.toLowerCase().includes(query)
-      const fieldnameMatch = field.fieldname?.toLowerCase().includes(query)
+      // Then apply search filter if there is a search query
+      if (!searchQuery.trim()) return true;
 
-      return labelMatch || fieldnameMatch
+      const query = searchQuery.toLowerCase();
+      const labelMatch = field.label?.toLowerCase().includes(query);
+      const fieldnameMatch = field.fieldname?.toLowerCase().includes(query);
+
+      return labelMatch || fieldnameMatch;
     }) || []
 
   const renderFieldCard = (field, index) => {
