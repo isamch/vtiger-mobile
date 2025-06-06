@@ -1,3 +1,5 @@
+"use client"
+
 import { useEffect, useState } from "react"
 import {
   View,
@@ -28,6 +30,7 @@ const IndexScreen = ({ route, navigation }) => {
   const [error, setError] = useState(null)
   const [filteredData, setFilteredData] = useState([])
   const [refreshing, setRefreshing] = useState(false)
+  const [mainContentHeight, setMainContentHeight] = useState(0)
 
   // UI states
   const [searchQuery, setSearchQuery] = useState("")
@@ -38,6 +41,9 @@ const IndexScreen = ({ route, navigation }) => {
   const [sortBy, setSortBy] = useState("id")
   const [sortOrder, setSortOrder] = useState("desc")
   const [showFilters, setShowFilters] = useState(false)
+  const [showRelatedModules, setShowRelatedModules] = useState(new Set())
+  const [showFAB, setShowFAB] = useState(false)
+  const [fabExpanded, setFabExpanded] = useState(false)
 
   // Animation states
   const filterPanelHeight = useState(new Animated.Value(0))[0]
@@ -93,8 +99,14 @@ const IndexScreen = ({ route, navigation }) => {
       const result = await getModuleData(moduleName)
       setData(result)
 
+      // Add test related modules data
       if (result && Array.isArray(result) && result.length > 0) {
-        setFilteredData(result)
+        const testRelatedModules = ["Contacts", "Emails", "Tasks", "Calendar", "Documents"]
+        const updatedResult = result.map((item, index) => ({
+          ...item,
+          relatedModules: testRelatedModules.slice(0, Math.min(5, testRelatedModules.length)),
+        }))
+        setFilteredData(updatedResult)
       } else {
         setFilteredData([])
       }
@@ -232,15 +244,53 @@ const IndexScreen = ({ route, navigation }) => {
     const detailFields = item.fields
     const recordId = detailFields.find((f) => f.fieldname === "id")?.value
     const relatedModules = item.relatedModules || []
+    const itemIndex = filteredData.indexOf(item)
+    // const isRelatedVisible = showRelatedModules.has(itemIndex)
 
     const getModuleColor = (moduleName) => {
-      return styles.classicModuleColors[moduleName] || "#6b7280"
+      const colors = {
+        Assets: "#3b82f6",
+        Calendar: "#2196F3",
+        Campaigns: "#ec4899",
+        Contacts: "#2196F3",
+        Documents: "#2196F3",
+        Emails: "#2196F3",
+        HelpDesk: "#ef4444",
+        Invoice: "#10b981",
+        ModComments: "#6b7280",
+        PBXManager: "#8b5cf6",
+        Potentials: "#f97316",
+        Products: "#0ea5e9",
+        Project: "#8b5cf6",
+        Quotes: "#84cc16",
+        SalesOrder: "#14b8a6",
+        ServiceContracts: "#ec4899",
+        Services: "#f59e0b",
+        Tasks: "#2196F3",
+      }
+      return colors[moduleName] || "#2196F3"
+    }
+
+    const toggleRelatedModules = () => {
+      const newShowRelatedModules = new Set(showRelatedModules)
+      if (newShowRelatedModules.has(itemIndex)) {
+        newShowRelatedModules.delete(itemIndex)
+      } else {
+        newShowRelatedModules.add(itemIndex)
+      }
+      setShowRelatedModules(newShowRelatedModules)
     }
 
     return (
       <View style={styles.classicDetailsContainer}>
         {/* Main Content Column */}
-        <View style={styles.classicDetailsMainContent}>
+        <View 
+          style={styles.classicDetailsMainContent}
+          onLayout={(event) => {
+            const { height } = event.nativeEvent.layout
+            setMainContentHeight(height)
+          }}
+        >
           <ScrollView
             style={styles.classicDetailsScrollView}
             contentContainerStyle={styles.classicDetailsScrollContent}
@@ -271,43 +321,48 @@ const IndexScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/* Related Modules Column */}
-        {relatedModules.length > 0 && (
-          <View style={styles.classicRelatedModulesContainer}>
-            <Text style={styles.classicRelatedModulesTitle}>Related</Text>
-            <ScrollView
-              style={styles.classicRelatedModulesList}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 80 }} // Match main content padding
-            >
-              {relatedModules.map((module, moduleIndex) => (
-                <TouchableOpacity
-                  key={moduleIndex}
-                  style={styles.classicRelatedModuleButton}
-                  onPress={() => navigation.navigate("IndexScreen", { moduleName: module })}
-                >
-                  <View style={[
-                    styles.classicRelatedModuleIconContainer,
-                    { backgroundColor: `${getModuleColor(module)}15` }
-                  ]}>
-                    <Icon
-                      name={getModuleIcon(module)}
-                      size={18}
-                      color={getModuleColor(module)}
-                      style={styles.classicRelatedModuleIcon}
-                    />
-                  </View>
-                  <Text style={[
-                    styles.classicRelatedModuleText,
-                    { color: getModuleColor(module) }
-                  ]} numberOfLines={1}>
-                    {module}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+        {/* Related Modules Buttons */}
+        <View style={styles.relatedButtonsContainer}>
+          {/* Main Related Button */}
+          {/* <TouchableOpacity
+            style={[styles.relatedMainButton, isRelatedVisible && styles.relatedMainButtonActive]}
+            onPress={toggleRelatedModules}
+          >
+            <Icon name={isRelatedVisible ? "close" : "link"} size={20} color="#ffffff" />
+          </TouchableOpacity> */}
+
+          {/* Related Module Buttons with Scrolling */}
+          {/* {isRelatedVisible && ( */}
+            <View style={[
+              styles.relatedButtonsScrollContainer,
+              { maxHeight: mainContentHeight > 0 ? mainContentHeight : undefined }
+            ]}>
+              <ScrollView
+                style={styles.relatedButtonsScrollView}
+                contentContainerStyle={styles.relatedButtonsScrollContent}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+                bounces={true}
+              >
+                {relatedModules.map((module, moduleIndex) => {
+                  const moduleColor = getModuleColor(module)
+                  return (
+                    <TouchableOpacity
+                      key={moduleIndex}
+                      style={[styles.relatedModuleButton, { backgroundColor: moduleColor , }]}
+                      onPress={() => {
+                        navigation.navigate("ModuleScreen", { moduleName: module })
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Icon name={getModuleIcon(module)} size={18} color="#ffffff" />
+                    </TouchableOpacity>
+                  )
+                })}
+              </ScrollView>
+            </View>
+          {/* )} */}
+        </View>
       </View>
     )
   }
@@ -585,37 +640,42 @@ const IndexScreen = ({ route, navigation }) => {
                 {relatedModules.length > 0 && (
                   <View style={styles.relatedModulesContainer}>
                     <Text style={styles.relatedModulesTitle}>Related Modules</Text>
-                    <ScrollView 
-                      horizontal 
+                    <ScrollView
+                      horizontal
                       showsHorizontalScrollIndicator={false}
                       style={styles.relatedModulesScroll}
                       contentContainerStyle={styles.relatedModulesList}
                     >
                       {relatedModules.map((module, moduleIndex) => {
-                        const isActive = false; // You can add logic here to determine if module is active
+                        const moduleColor = getModuleColor(module)
+                        const isActive = false // You can add logic here to determine if module is active
                         return (
                           <TouchableOpacity
                             key={moduleIndex}
                             style={[
                               styles.relatedModuleButton,
-                              isActive && styles.relatedModuleButtonActive
+                              isActive && styles.relatedModuleButtonActive,
+                              { borderColor: isActive ? moduleColor : "#e2e8f0" }
                             ]}
                             onPress={() => navigation.navigate("IndexScreen", { moduleName: module })}
                           >
-                            <Icon 
-                              name={getModuleIcon(module)} 
-                              size={14} 
-                              color={isActive ? "#ffffff" : "#64748b"} 
+                            <Icon
+                              name={getModuleIcon(module)}
+                              size={16}
+                              color={isActive ? "#ffffff" : moduleColor}
                               style={styles.relatedModuleIcon}
                             />
-                            <Text style={[
-                              styles.relatedModuleText,
-                              isActive && styles.relatedModuleTextActive
-                            ]}>
+                            <Text 
+                              style={[
+                                styles.relatedModuleText,
+                                isActive && styles.relatedModuleTextActive,
+                                !isActive && { color: moduleColor }
+                              ]}
+                            >
                               {module}
                             </Text>
                           </TouchableOpacity>
-                        );
+                        )
                       })}
                     </ScrollView>
                   </View>
@@ -950,6 +1010,16 @@ const IndexScreen = ({ route, navigation }) => {
       </View>
     )
   }
+
+  useEffect(() => {
+    // Show FAB when we have data with related modules
+    if (filteredData && filteredData.length > 0) {
+      const hasRelatedModules = filteredData.some((item) => item.relatedModules && item.relatedModules.length > 0)
+      setShowFAB(hasRelatedModules)
+    } else {
+      setShowFAB(false)
+    }
+  }, [filteredData])
 
   return (
     <View style={[styles.container, styleMode === "classic" && styles.classicContainer]}>
@@ -1958,68 +2028,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
     marginBottom: 8,
-    flexDirection: 'row',
-    overflow: 'hidden',
-    minHeight: 300,
+    flexDirection: "row",
+    overflow: "hidden",
+    height: "fit-content",
   },
   classicDetailsMainContent: {
     flex: 1,
-    borderRightWidth: 1,
-    borderRightColor: "#e5e7eb",
-    position: 'relative',
-    backgroundColor: '#ffffff',
+    position: "relative",
   },
   classicDetailsScrollView: {
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 80,
   },
-  classicRelatedModulesContainer: {
-    width: 60,
-    backgroundColor: "transparent",
-    maxHeight: 300,
-  },
-  classicRelatedModulesTitle: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#6b7280",
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  classicRelatedModulesList: {
-    flexGrow: 0,
-  },
-  classicRelatedModuleButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 8,
-    position: 'relative',
-  },
-  classicRelatedModuleIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: "#f3f4f6",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 2,
-  },
-  classicRelatedModuleIcon: {
-    width: 20,
-    height: 20,
-  },
-  classicRelatedModuleText: {
-    fontSize: 9,
-    color: "#6b7280",
-    textAlign: 'center',
-    marginTop: 2,
-  },
   classicDetailsScrollContent: {
-    paddingBottom: 16,
   },
   classicDetailRow: {
     flexDirection: "row",
@@ -2039,24 +2061,16 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
   classicFixedButtonContainer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
+    paddingVertical: 16,
     borderTopColor: "#e5e7eb",
-    backgroundColor: "#ffffff",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+
   },
+
   classicUpdateButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -2068,11 +2082,11 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: -2,
     },
     shadowOpacity: 0.15,
     shadowRadius: 3,
-    elevation: 2,
+    elevation: -2,
   },
   classicUpdateButtonText: {
     fontSize: 15,
@@ -2081,25 +2095,174 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     letterSpacing: 0.3,
   },
-  classicModuleColors: {
-    Assets: "#3b82f6",
-    Calendar: "#8b5cf6",
-    Campaigns: "#ec4899",
-    Contacts: "#14b8a6",
-    Documents: "#f59e0b",
-    Emails: "#6366f1",
-    HelpDesk: "#ef4444",
-    Invoice: "#10b981",
-    ModComments: "#6b7280",
-    PBXManager: "#8b5cf6",
-    Potentials: "#f97316",
-    Products: "#0ea5e9",
-    Project: "#8b5cf6",
-    Quotes: "#84cc16",
-    SalesOrder: "#14b8a6",
-    ServiceContracts: "#ec4899",
-    Services: "#f59e0b"
+  classicAssignedToContainer: {
+    flexDirection: "column",
+    alignItems: "flex-end",
+    flex: 1,
+  },
+  classicAssignedToLabel: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginBottom: 2,
+  },
+  classicAssignedToValue: {
+    fontSize: 14,
+    color: "#111827",
+    fontWeight: "500",
+  },
+  classicAvatarCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#f0f9ff",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: "#e0e7ff",
+  },
+  classicAvatarText: {
+    color: "#2196F3",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  classicContentContainer: {
+    flex: 1,
+  },
+
+  // Related Modules Styles
+  relatedModulesContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+  },
+  relatedModulesTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1e293b",
+    marginBottom: 12,
+  },
+  relatedModulesScroll: {
+    marginHorizontal: -4,
+  },
+  relatedModulesList: {
+    paddingHorizontal: 4,
+    gap: 8,
+  },
+  relatedModuleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    marginRight: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  relatedModuleButtonActive: {
+    backgroundColor: "#2196F3",
+    borderColor: "#2196F3",
+  },
+  relatedModuleIcon: {
+    marginRight: 6,
+  },
+  relatedModuleText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#64748b",
+  },
+  relatedModuleTextActive: {
+    color: "#ffffff",
+  },
+
+  // Related Buttons Container (New Design)
+  relatedButtonsContainer: {
+    width: 70,
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 10,
+    height: "100%",
+
+    // backgroundColor: "red",
+  },
+  relatedMainButton: {
+    backgroundColor: "blue",
+    width: 100,
+    height: 100,
+    borderRadius: 25,
+    backgroundColor: "#2196F3",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#2196F3",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    marginBottom: 16,
+    borderWidth: 3,
+    borderColor: "#ffffff",
+  },
+  relatedButtonsScrollContainer: {
+    flex: 1,
+    width: "100%",
+  },
+  relatedButtonsScrollView: {
+    flex: 1,
+    width: "100%",
+  },
+  relatedButtonsScrollContent: {
+    alignItems: "center",
+    paddingVertical: 4,
+    gap: 4,
+  },
+
+  // Professional floating effects
+  relatedButtonHover: {
+    transform: [{ scale: 1.1 }],
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 10,
   },
 })
+
+const getModuleColor = (moduleName) => {
+  const colors = {
+    Assets: "#8B5CF6", // Purple
+    Calendar: "#3B82F6", // Blue
+    Campaigns: "#EC4899", // Pink
+    Contacts: "#10B981", // Emerald
+    Documents: "#F59E0B", // Amber
+    Emails: "#6366F1", // Indigo
+    HelpDesk: "#EF4444", // Red
+    Invoice: "#059669", // Green
+    ModComments: "#6B7280", // Gray
+    PBXManager: "#8B5CF6", // Purple
+    Potentials: "#F97316", // Orange
+    Products: "#0EA5E9", // Sky
+    Project: "#7C3AED", // Violet
+    Quotes: "#84CC16", // Lime
+    SalesOrder: "#06B6D4", // Cyan
+    ServiceContracts: "#EC4899", // Pink
+    Services: "#F59E0B", // Amber
+    Tasks: "#3B82F6", // Blue
+    Leads: "#10B981", // Emerald
+    Accounts: "#6366F1", // Indigo
+    Events: "#8B5CF6", // Purple
+  }
+  return colors[moduleName] || "#6B7280"
+}
 
 export default IndexScreen
