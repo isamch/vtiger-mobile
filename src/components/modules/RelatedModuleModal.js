@@ -291,10 +291,26 @@ const RelatedModuleModal = ({
       );
     }
 
+    if (error || error?.message) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Icon name="error-outline" size={48} color="#ef4444" />
+          <Text style={styles.emptyText}>Error loading data</Text>
+          <Text style={[styles.emptyText, { fontSize: 14, marginTop: 8 }]}>
+            {error?.response?.data?.message || error?.message || 'An unexpected error occurred'}
+          </Text>
+        </View>
+      );
+    }
+
     if (data.length === 0) {
       return (
         <View style={styles.emptyContainer}>
+          <Icon name="inbox" size={48} color="#d1d5db" />
           <Text style={styles.emptyText}>No data available</Text>
+          <Text style={[styles.emptyText, { fontSize: 14, marginTop: 8 }]}>
+            There are no records to display for this module.
+          </Text>
         </View>
       );
     }
