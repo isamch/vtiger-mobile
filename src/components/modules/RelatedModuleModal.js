@@ -126,11 +126,10 @@ const RelatedModuleModal = ({
       case 'boolean':
         return field.value === 'yes' ? 'Yes' : 'No';
       case 'owner':
+      case 'reference':
         return field.userMap?.[field.value] || field.value;
       case 'picklist':
         return field.value;
-      case 'reference':
-        return field.value || 'Not linked';
       default:
         return String(field.value);
     }
