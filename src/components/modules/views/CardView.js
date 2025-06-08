@@ -36,7 +36,7 @@ const CardView = ({
 
       const relatedData = await getRelatedModuleData(moduleName, recordId, module);
       
-      console.log('Related data received:', relatedData);
+      console.log('Related data received in CardView:', relatedData);
       
       if (Array.isArray(relatedData)) {
         setModalData(relatedData);
@@ -208,6 +208,7 @@ const CardView = ({
         relatedModule={selectedModule}
         data={modalData}
         loading={loading}
+        navigation={navigation}
       />
     </View>
   );

@@ -1,17 +1,20 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   Modal,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   Animated,
-  ActivityIndicator,
-  RefreshControl,
   Dimensions,
+  Pressable,
+  TextInput,
+  PanResponder,
+  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { getModuleIcon } from '../../utils/moduleUtils';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -27,247 +30,291 @@ const RelatedModuleModal = ({
   onAdd,
   onUpdate,
   onDelete,
+  navigation,
 }) => {
-  const slideAnim = new Animated.Value(0);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [searchQuery, setSearchQuery] = useState('');
+  const [modalHeight, setModalHeight] = useState(SCREEN_HEIGHT * 0.8);
+  const initialModalHeight = useRef(SCREEN_HEIGHT * 0.8);
+  const heightAnim = useRef(new Animated.Value(SCREEN_HEIGHT * 0.8)).current;
+  const [expandedRecords, setExpandedRecords] = useState({});
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        heightAnim.setOffset(modalHeight);
+        heightAnim.setValue(0);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const newHeight = initialModalHeight.current - gestureState.dy;
+        if (newHeight > SCREEN_HEIGHT * 0.3 && newHeight < SCREEN_HEIGHT * 0.9) {
+          heightAnim.setValue(-gestureState.dy);
+        } else if (newHeight <= SCREEN_HEIGHT * 0.3) {
+          heightAnim.setValue(-(SCREEN_HEIGHT * 0.8 - SCREEN_HEIGHT * 0.3));
+        } else if (newHeight >= SCREEN_HEIGHT * 0.9) {
+          heightAnim.setValue(-(SCREEN_HEIGHT * 0.8 - SCREEN_HEIGHT * 0.9));
+        }
+      },
+      onPanResponderRelease: () => {
+        heightAnim.flattenOffset();
+        const currentHeight = heightAnim._value;
+        if (currentHeight > SCREEN_HEIGHT * 0.3 && currentHeight < SCREEN_HEIGHT * 0.9) {
+          setModalHeight(currentHeight);
+        } else if (currentHeight <= SCREEN_HEIGHT * 0.3) {
+          setModalHeight(SCREEN_HEIGHT * 0.3);
+        } else {
+          setModalHeight(SCREEN_HEIGHT * 0.9);
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
     if (visible) {
       slideAnim.setValue(0);
-      Animated.spring(slideAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 7,
-      }).start();
+      fadeAnim.setValue(0);
+      heightAnim.setValue(modalHeight);
+
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    } else {
+      // Reset heightAnim to initialModalHeight when modal closes
+      heightAnim.setValue(initialModalHeight.current);
     }
   }, [visible]);
 
-  const formatFieldValue = (field) => {
-    const { type, value, userMap } = field;
-    
-    if (!value || value === '') return 'Not set';
+  const handleClose = () => {
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: false,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: false,
+      }),
+    ]).start(() => {
+      onClose();
+    });
+  };
 
-    switch (type) {
+  const formatValue = (field) => {
+    if (!field || !field.value || field.value === '') return 'Not set';
+    
+    switch (field.type) {
       case 'date':
-        return new Date(value).toLocaleDateString();
+        return new Date(field.value).toLocaleDateString();
       case 'datetime':
-        return new Date(value).toLocaleString();
+        return new Date(field.value).toLocaleString();
       case 'time':
-        return value;
+        return field.value;
       case 'boolean':
-        return value === 'yes' ? 'Yes' : 'No';
+        return field.value === 'yes' ? 'Yes' : 'No';
       case 'owner':
-        return userMap?.[value] || value;
+        return field.userMap?.[field.value] || field.value;
       case 'picklist':
-        return value;
+        return field.value;
       case 'reference':
-        return value || 'Not linked';
-      case 'integer':
-        return value === 'no' ? 'No' : value;
+        return field.value || 'Not linked';
       default:
-        return String(value);
+        return String(field.value);
     }
   };
 
-  const getImportantFields = (record) => {
-    if (!Array.isArray(record)) return [];
-    
-    const importantFieldNames = [
+  const getStatusColor = (status) => {
+    if (!status) return '#64748b';
+    const statusLower = String(status).toLowerCase();
+    if (statusLower.includes('completed') || statusLower.includes('closed')) return '#10b981';
+    if (statusLower.includes('pending') || statusLower.includes('in progress')) return '#f59e0b';
+    if (statusLower.includes('cancelled') || statusLower.includes('failed')) return '#ef4444';
+    return '#64748b';
+  };
+
+  const renderRecord = (record, toggleExpand, isExpanded) => {
+    if (!record || !Array.isArray(record)) {
+      console.warn('Invalid record format:', record);
+      return null;
+    }
+
+    const subjectField = record.find(f => f && f.fieldname === 'subject');
+    const statusField = record.find(f => f && (f.fieldname === 'taskstatus' || f.fieldname === 'eventstatus' || f.fieldname === 'leadstatus' || f.fieldname === 'opportunity_stage'));
+    const dateField = record.find(f => f && (f.fieldname === 'date_start' || f.fieldname === 'createdtime' || f.fieldname === 'date_end' || f.fieldname === 'due_date'));
+    const assignedField = record.find(f => f && f.fieldname === 'assigned_user_id');
+    const descriptionField = record.find(f => f && f.fieldname === 'description');
+    const recordId = record.find(f => f && f.fieldname === 'id')?.value || Math.random().toString();
+
+    const fieldsToExclude = new Set([
+      'id',
       'subject',
-      'assigned_user_id',
+      'description',
+      'createdtime',
+      'modifiedtime',
       'date_start',
+      'date_end',
+      'due_date',
+      'time_start',
+      'time_end',
+      'assigned_user_id',
       'taskstatus',
       'eventstatus',
-      'activitytype',
-    ];
-    return record.filter(field => importantFieldNames.includes(field.fieldname));
-  };
+      'leadstatus',
+      'opportunity_stage',
+    ]);
 
-  const getStatusField = (record) => {
-    if (!Array.isArray(record)) return null;
-    
-    return record.find(field => 
-      field.fieldname === 'taskstatus' || 
-      field.fieldname === 'eventstatus' ||
-      field.fieldname.toLowerCase().includes('status')
-    );
-  };
-
-  const getStatusStyle = (status) => {
-    if (!status) return styles.statusDefault;
-
-    const statusLower = String(status).toLowerCase();
-    if (statusLower.includes('completed') || statusLower.includes('closed') || statusLower.includes('held')) {
-      return styles.statusSuccess;
-    }
-    if (statusLower.includes('pending') || statusLower.includes('planned')) {
-      return styles.statusWarning;
-    }
-    if (statusLower.includes('deferred') || statusLower.includes('cancelled')) {
-      return styles.statusDanger;
-    }
-    return styles.statusDefault;
-  };
-
-  const createUniqueKey = (field, index) => {
-    const base = field.fieldname || 'field';
-    const label = field.label || '';
-    const value = field.value || '';
-    return `${base}-${label}-${value}-${index}`;
-  };
-
-  const renderField = (field, index) => {
-    if (!field || field.fieldname === 'id') return null;
-
-    let displayValue = field.value;
-    if (!displayValue || displayValue === '') {
-      displayValue = 'Not set';
-    } else if (field.type === 'date') {
-      displayValue = new Date(field.value).toLocaleDateString();
-    } else if (field.type === 'datetime') {
-      displayValue = new Date(field.value).toLocaleString();
-    } else if (field.type === 'owner' && field.userMap) {
-      displayValue = field.userMap[field.value] || field.value;
-    }
+    const filteredFields = record.filter(f => f && !fieldsToExclude.has(f.fieldname));
+    const displayedFields = isExpanded ? filteredFields : filteredFields.slice(0, 6);
 
     return (
-      <View key={createUniqueKey(field, index)} style={styles.field}>
-        <Text style={styles.fieldLabel}>{field.label}</Text>
-        <Text style={styles.fieldValue}>{displayValue}</Text>
-      </View>
-    );
-  };
-
-  const renderRecord = (record) => {
-    if (!Array.isArray(record) || record.length === 0) return null;
-
-    const importantFields = getImportantFields(record);
-    const statusField = getStatusField(record);
-    const recordId = record.find(field => field.fieldname === 'id')?.value;
-    const subjectField = record.find(field => field.fieldname === 'subject');
-
-    return (
-      <View key={recordId} style={styles.recordContainer}>
+      <View key={recordId} style={styles.recordBlock}>
         <View style={styles.recordHeader}>
-          <View style={styles.recordTitleContainer}>
-            <Text style={styles.recordTitle} numberOfLines={1}>
-              {subjectField ? formatFieldValue(subjectField) : `Record #${recordId}`}
+          <View style={styles.recordHeaderLeft}>
+            <View style={styles.recordIcon}>
+              <Icon name={getModuleIcon(relatedModule)} size={20} color="#2196F3" />
+            </View>
+            <View style={styles.recordHeaderInfo}>
+              <Text style={styles.recordTitle} numberOfLines={1}>{subjectField?.value || 'Untitled Record'}</Text>
+              {dateField && (
+                <Text style={styles.recordSubtitle}>{formatValue(dateField)}</Text>
+              )}
+            </View>
+          </View>
+          {statusField && (
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(statusField.value) }]}>
+              <Text style={styles.statusText}>{statusField.value}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.recordContent}>
+          {descriptionField?.value && (
+            <Text style={styles.recordDescription}>
+              {descriptionField.value}
             </Text>
-            {statusField && (
-              <View style={[styles.statusBadge, getStatusStyle(statusField.value)]}>
-                <Text style={styles.statusText}>
-                  {formatFieldValue(statusField)}
+          )}
+          
+          <View style={styles.recordFieldsGrid}>
+            {displayedFields.map((field, fieldIndex) => (
+              <View key={fieldIndex} style={styles.recordGridField}>
+                <Text style={styles.recordGridFieldLabel}>{field.label}</Text>
+                <Text style={[styles.recordGridFieldValue, !field.value && styles.emptyValue]}>
+                  {formatValue(field)}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {filteredFields.length > 6 && (
+            <TouchableOpacity style={styles.expandButton} onPress={toggleExpand}>
+              <Text style={styles.expandButtonText}>
+                {isExpanded ? "View less fields" : `View ${filteredFields.length - 6} more fields`}
+              </Text>
+              <Icon name={isExpanded ? "expand-less" : "expand-more"} size={16} color="#2196F3" />
+            </TouchableOpacity>
+          )}
+
+          <View style={styles.recordFooter}>
+            {assignedField && (
+              <View style={styles.assignedInfo}>
+                <Icon name="person" size={16} color="#64748b" />
+                <Text style={styles.assignedText}>
+                  Assigned To: {formatValue(assignedField)}
                 </Text>
               </View>
             )}
-          </View>
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.editButton]}
-              onPress={() => onUpdate(recordId, record)}
-            >
-              <Icon name="edit" size={16} color="#fff" />
-              <Text style={styles.actionButtonText}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.deleteButton]}
-              onPress={() => onDelete(recordId)}
-            >
-              <Icon name="delete" size={16} color="#fff" />
-              <Text style={styles.actionButtonText}>Delete</Text>
-            </TouchableOpacity>
+            <View style={styles.recordActions}>
+          
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => navigation.navigate("ViewScreen", { moduleName: relatedModule, recordId })}
+              >
+                <Icon name="visibility" size={16} color="#64748b" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => navigation.navigate('EditScreen', { moduleName: relatedModule, recordId })}
+              >
+                <Icon name="edit" size={16} color="#64748b" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionButton} onPress={() => console.log('Share', recordId)}>
+                <Icon name="share" size={16} color="#64748b" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-
-        <View style={styles.importantFieldsContainer}>
-          {importantFields.map((field, index) => renderField(field, index))}
-        </View>
-
-        <TouchableOpacity
-          style={styles.expandButton}
-          onPress={() => console.log('Show all fields')}
-        >
-          <Text style={styles.expandButtonText}>
-            Show all fields
-          </Text>
-          <Icon name="expand-more" size={16} color="#2196F3" />
-        </TouchableOpacity>
       </View>
     );
   };
 
-  const renderContent = () => {
-    console.log('Rendering modal content:', {
-      loading,
-      error,
-      dataLength: data?.length,
-      data
-    });
+  const filteredData = Array.isArray(data) ? data.filter(record => {
+    if (!searchQuery) return true;
+    if (!Array.isArray(record)) return false;
+    
+    const searchLower = searchQuery.toLowerCase();
+    return record.some(field => 
+      field && 
+      String(field.value || '').toLowerCase().includes(searchLower) ||
+      String(field.label || '').toLowerCase().includes(searchLower)
+    );
+  }) : [];
 
+  const renderContent = () => {
     if (loading) {
       return (
-        <View style={styles.centerContent}>
+        <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#2196F3" />
-          <Text style={styles.loadingText}>Loading {relatedModule}...</Text>
+          <Text style={styles.loaderText}>Loading data...</Text>
         </View>
       );
     }
 
-    if (error) {
+    if (!Array.isArray(data)) {
+      console.warn('Data is not an array:', data);
       return (
-        <View style={styles.centerContent}>
-          <Icon name="error-outline" size={48} color="#ef4444" />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={onRefresh}>
-            <Icon name="refresh" size={20} color="#fff" />
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Invalid data format</Text>
         </View>
       );
     }
 
-    // Ensure data is in the correct format
-    const records = Array.isArray(data) ? data : [];
-    
-    if (records.length === 0) {
+    if (data.length === 0) {
       return (
-        <View style={styles.centerContent}>
-          <Icon name="inbox" size={48} color="#94a3b8" />
-          <Text style={styles.emptyText}>No related {relatedModule} found</Text>
-          <TouchableOpacity style={styles.addFirstButton} onPress={onAdd}>
-            <Icon name="add-circle" size={20} color="#fff" />
-            <Text style={styles.addFirstButtonText}>Add First Record</Text>
-          </TouchableOpacity>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No data available</Text>
         </View>
       );
     }
 
     return (
-      <ScrollView
-        style={styles.scrollContent}
-        contentContainerStyle={styles.scrollContentContainer}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#2196F3']}
-          />
-        }
-      >
-        {records.map((record, index) => {
-          // If record is an array of fields, use it directly
-          const fields = Array.isArray(record) ? record : [record];
-          console.log('Rendering record:', { index, fields });
-          return renderRecord(fields);
-        })}
-
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={onAdd}
-        >
-          <Icon name="add" size={20} color="#fff" />
-          <Text style={styles.addButtonText}>Add New {relatedModule}</Text>
-        </TouchableOpacity>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.dataContainer}>
+          {filteredData.map(record => {
+            const recordId = record.find(f => f && f.fieldname === 'id')?.value || Math.random().toString();
+            const isExpanded = expandedRecords[recordId] || false;
+            const toggleExpand = () => {
+              setExpandedRecords(prev => ({
+                ...prev,
+                [recordId]: !prev[recordId]
+              }));
+            };
+            return renderRecord(record, toggleExpand, isExpanded);
+          })}
+        </View>
       </ScrollView>
     );
   };
@@ -279,12 +326,19 @@ const RelatedModuleModal = ({
       visible={visible}
       transparent
       animationType="none"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
+      statusBarTranslucent
     >
-      <View style={styles.modalOverlay}>
+      <Animated.View 
+        style={[
+          styles.modalOverlay,
+          { opacity: fadeAnim }
+        ]}
+        onPress={handleClose}
+      >
         <Animated.View
           style={[
-            styles.modalContent,
+            styles.modalContainer,
             {
               transform: [
                 {
@@ -297,52 +351,49 @@ const RelatedModuleModal = ({
             },
           ]}
         >
-          <View style={styles.modalHeader}>
-            <View style={styles.modalTitleContainer}>
-              <Icon 
-                name={getModuleIcon(relatedModule)} 
-                size={24} 
-                color="#2196F3" 
-                style={styles.modalIcon}
-              />
-              <Text style={styles.modalTitle}>Related {relatedModule}</Text>
+          <Animated.View
+            style={[
+              styles.modalContent,
+              { height: heightAnim }
+            ]}
+            onStartShouldSetResponder={() => true}
+            onResponderRelease={(e) => e.stopPropagation()}
+          >
+            <View {...panResponder.panHandlers} style={styles.dragHandle}>
+              <View style={styles.dragIndicator} />
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Icon name="close" size={24} color="#64748b" />
-            </TouchableOpacity>
-          </View>
 
-          <View style={styles.contentContainer}>
-            {renderContent()}
-          </View>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{relatedModule}</Text>
+              <Pressable onPress={handleClose} style={styles.closeButton}>
+                <Icon name="close" size={24} color="#64748b" />
+              </Pressable>
+            </View>
+
+            <View style={styles.searchContainer}>
+              <Icon name="search" size={20} color="#64748b" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search records..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholderTextColor="#94a3b8"
+              />
+              {searchQuery ? (
+                <Pressable onPress={() => setSearchQuery('')} style={styles.clearButton}>
+                  <Icon name="close" size={20} color="#64748b" />
+                </Pressable>
+              ) : null}
+            </View>
+
+            <View style={styles.contentContainer}>
+              {renderContent()}
+            </View>
+          </Animated.View>
         </Animated.View>
-      </View>
+      </Animated.View>
     </Modal>
   );
-};
-
-const getModuleIcon = (moduleName) => {
-  const iconMap = {
-    Calendar: "event",
-    Contacts: "person",
-    Potentials: "trending-up",
-    HelpDesk: "support",
-    Invoice: "receipt",
-    Quotes: "description",
-    Products: "inventory",
-    Project: "work",
-    Assets: "business-center",
-    Campaigns: "campaign",
-    Documents: "folder",
-    Emails: "email",
-    SalesOrder: "shopping-cart",
-    Services: "build",
-    Leads: "person-add",
-    Accounts: "business",
-    Tasks: "assignment",
-    Events: "event-note",
-  };
-  return iconMap[moduleName] || "folder";
 };
 
 const styles = StyleSheet.create({
@@ -351,15 +402,30 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
+  modalContainer: {
+    width: '100%',
+    position: 'absolute',
+    bottom: 0,
+  },
   modalContent: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    minHeight: '50%',
-    maxHeight: '90%',
+    overflow: 'hidden',
   },
-  contentContainer: {
-    flex: 1,
+  dragHandle: {
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  dragIndicator: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 2,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -368,166 +434,100 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
-  },
-  modalTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  modalIcon: {
-    marginRight: 8,
+    backgroundColor: '#fff',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: '#1e293b',
   },
   closeButton: {
     padding: 8,
   },
-  addButton: {
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2196F3',
-    margin: 16,
-    padding: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  centerContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#64748b',
-  },
-  errorText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#ef4444',
-    textAlign: 'center',
-  },
-  emptyText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#94a3b8',
-    marginBottom: 16,
-  },
-  retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginTop: 16,
-  },
-  retryButtonText: {
-    color: '#fff',
-    marginLeft: 8,
-    fontWeight: '500',
-  },
-  addFirstButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addFirstButtonText: {
-    color: '#fff',
-    marginLeft: 8,
-    fontWeight: '500',
-  },
-  scrollContent: {
-    flex: 1,
-    padding: 16,
-  },
-  recordContainer: {
     backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1e293b',
+    padding: 0,
+  },
+  clearButton: {
+    padding: 4,
+  },
+  contentContainer: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  dataContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  recordBlock: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    overflow: 'hidden',
   },
   recordHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    backgroundColor: '#f8fafc',
   },
-  recordTitleContainer: {
-    flex: 1,
+  recordHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    flex: 1,
+  },
+  recordIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#f0f9ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  recordHeaderInfo: {
+    flex: 1,
   },
   recordTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1e293b',
-    flex: 1,
   },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    borderRadius: 6,
-    gap: 4,
-  },
-  editButton: {
-    backgroundColor: '#f59e0b',
-  },
-  deleteButton: {
-    backgroundColor: '#ef4444',
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  importantFieldsContainer: {
-    marginBottom: 12,
-  },
-  field: {
-    marginBottom: 16,
-  },
-  fieldLabel: {
+  recordSubtitle: {
     fontSize: 14,
     color: '#64748b',
-    marginBottom: 4,
-  },
-  fieldValue: {
-    fontSize: 16,
-    color: '#1e293b',
-  },
-  expandButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-  },
-  expandButtonText: {
-    fontSize: 14,
-    color: '#2196F3',
-    fontWeight: '500',
-    marginRight: 4,
+    marginTop: 2,
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -536,24 +536,115 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '500',
     color: '#fff',
+    fontWeight: '500',
   },
-  statusSuccess: {
-    backgroundColor: '#10b981',
+  recordDate: {
+    fontSize: 12,
+    color: '#64748b',
   },
-  statusWarning: {
-    backgroundColor: '#f59e0b',
+  recordContent: {
+    padding: 16,
   },
-  statusDanger: {
-    backgroundColor: '#ef4444',
+  recordDescription: {
+    fontSize: 14,
+    color: '#475569',
+    marginBottom: 12,
+    lineHeight: 20,
   },
-  statusDefault: {
-    backgroundColor: '#64748b',
+  recordFieldsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+    marginBottom: 12,
   },
-  scrollContentContainer: {
-    flexGrow: 1,
-    paddingBottom: 20,
+  recordGridField: {
+    width: '50%',
+    paddingHorizontal: 6,
+    marginBottom: 12,
+  },
+  recordGridFieldLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  recordGridFieldValue: {
+    fontSize: 14,
+    color: '#1e293b',
+    fontWeight: '500',
+  },
+  emptyValue: {
+    fontStyle: 'italic',
+    color: '#9ca3af',
+  },
+  recordFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingTop: 12,
+    marginTop: 12,
+  },
+  assignedInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  assignedText: {
+    fontSize: 13,
+    color: '#64748b',
+    marginLeft: 4,
+  },
+  recordActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  expandButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  expandButtonText: {
+    fontSize: 14,
+    color: '#2196F3',
+    fontWeight: '500',
+    marginRight: 4,
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  loaderText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#64748b',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#64748b',
+    textAlign: 'center',
   },
 });
 

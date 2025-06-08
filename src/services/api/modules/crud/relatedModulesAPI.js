@@ -30,13 +30,17 @@ export const getRelatedModuleData = async (moduleName, recordId, relatedModule) 
             return [];
         }
 
-        // Handle nested array structure
         let records = result.data;
-        if (Array.isArray(records) && Array.isArray(records[0])) {
-            records = records[0];
-        }
 
-        return records || [];
+        // Ensure records is always an array of records, where each record is an array of fields.
+        // If result.data is an array but its first element is NOT an array, it means it's a single record (array of fields).
+        // In this case, wrap it to make it an array of records.
+        if (Array.isArray(records) && records.length > 0 && !Array.isArray(records[0])) {
+            records = [records];
+        }
+        // If it's already an array of arrays, or an empty array, keep as is.
+
+        return Array.isArray(records) ? records : [];
 
     } catch (error) {
         console.error('Error fetching related module data:', error);

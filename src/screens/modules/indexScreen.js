@@ -1,5 +1,3 @@
-"use client"
-
 import { useEffect, useState } from "react"
 import {
   View,
@@ -471,6 +469,7 @@ const IndexScreen = ({ route, navigation }) => {
         onAdd={handleAdd}
         onUpdate={handleUpdate}
         onDelete={handleDelete}
+        // navigation={navigation}
       />
 
       <Footer navigation={navigation} />
