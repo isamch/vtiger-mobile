@@ -137,6 +137,8 @@ const CardView = ({
                     style={styles.relatedModulesScroll}
                     contentContainerStyle={styles.relatedModulesList}
                     showsVerticalScrollIndicator={false}
+                    nestedScrollEnabled={true}
+                    scrollEnabled={true}
                   >
                     {relatedModules.map((module, moduleIndex) => {
                       const moduleColor = getModuleColor(module)
@@ -318,12 +320,15 @@ const styles = StyleSheet.create({
   relatedModulesSection: {
     width: 200,
     backgroundColor: '#ffffff',
+    borderLeftWidth: 1,
+    borderLeftColor: '#f1f5f9',
   },
   relatedModulesScroll: {
     flex: 1,
   },
   relatedModulesList: {
     padding: 8,
+    flexGrow: 1,
   },
   relatedModuleButton: {
     flexDirection: "row",
