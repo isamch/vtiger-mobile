@@ -316,8 +316,20 @@ const RelatedModuleModal = ({
     }
 
     return (
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.dataContainer}>
+      <View style={styles.scrollContainer}>
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.dataContainer}
+          showsVerticalScrollIndicator={true}
+          bounces={true}
+          scrollEnabled={true}
+          nestedScrollEnabled={true}
+          onStartShouldSetResponder={() => true}
+          onResponderTerminationRequest={() => false}
+          onMoveShouldSetResponder={() => true}
+          onTouchStart={() => true}
+          onTouchMove={() => true}
+        >
           {filteredData.map(record => {
             const recordId = record.find(f => f && f.fieldname === 'id')?.value || Math.random().toString();
             const isExpanded = expandedRecords[recordId] || false;
@@ -329,8 +341,8 @@ const RelatedModuleModal = ({
             };
             return renderRecord(record, toggleExpand, isExpanded);
           })}
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
     );
   };
 
@@ -344,14 +356,8 @@ const RelatedModuleModal = ({
       onRequestClose={handleClose}
       statusBarTranslucent
     >
-      <Animated.View 
-        style={[
-          styles.modalOverlay,
-          { opacity: fadeAnim }
-        ]}
-        onPress={handleClose}
-      >
-        <Animated.View
+      <View style={styles.modalOverlay}>
+        <Animated.View 
           style={[
             styles.modalContainer,
             {
@@ -371,8 +377,6 @@ const RelatedModuleModal = ({
               styles.modalContent,
               { height: heightAnim }
             ]}
-            onStartShouldSetResponder={() => true}
-            onResponderRelease={(e) => e.stopPropagation()}
           >
             <View {...panResponder.panHandlers} style={styles.dragHandle}>
               <View style={styles.dragIndicator} />
@@ -380,9 +384,9 @@ const RelatedModuleModal = ({
 
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{relatedModule}</Text>
-              <Pressable onPress={handleClose} style={styles.closeButton}>
+              <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
                 <Icon name="close" size={24} color="#64748b" />
-              </Pressable>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.searchContainer}>
@@ -395,9 +399,9 @@ const RelatedModuleModal = ({
                 placeholderTextColor="#94a3b8"
               />
               {searchQuery ? (
-                <Pressable onPress={() => setSearchQuery('')} style={styles.clearButton}>
+                <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
                   <Icon name="close" size={20} color="#64748b" />
-                </Pressable>
+                </TouchableOpacity>
               ) : null}
             </View>
 
@@ -406,7 +410,7 @@ const RelatedModuleModal = ({
             </View>
           </Animated.View>
         </Animated.View>
-      </Animated.View>
+      </View>
     </Modal>
   );
 };
@@ -484,6 +488,10 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   contentContainer: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  scrollContainer: {
     flex: 1,
     backgroundColor: '#f8fafc',
   },
